@@ -1,0 +1,2052 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>piggy. — Onchain Asset Protocol</title>
+
+    <!-- Ethers v6 UMD Build -->
+    <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.5/dist/ethers.umd.min.js"></script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,600;0,800;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
+
+    <style>
+        :root[data-theme="dark"] {
+            --bg: #050507;
+            --surface-1: #08080c;
+            --surface-2: #0d0d12;
+            --surface-hover: #12121a;
+
+            --border-subtle: transparent;
+            --border-focus: rgba(255, 0, 90, 0.4);
+
+            --pink-primary: #ff0055;
+            --pink-glow: rgba(255, 0, 90, 0.2);
+            --pink-subtle: rgba(255, 0, 90, 0.08);
+
+            --text-main: #f1f1f5;
+            --text-muted: #525263;
+            --input-bg: #0b0b10;
+
+            --danger: #ff3b30;
+            --danger-subtle: rgba(255, 59, 48, 0.08);
+        }
+
+        :root[data-theme="light"] {
+            --bg: #f8f8fa;
+            --surface-1: #ffffff;
+            --surface-2: #f1f1f5;
+            --surface-hover: #e8e8f0;
+
+            --border-subtle: transparent;
+            --border-focus: rgba(255, 0, 90, 0.3);
+
+            --pink-primary: #ff0055;
+            --pink-glow: rgba(255, 0, 90, 0.12);
+            --pink-subtle: rgba(255, 0, 90, 0.05);
+
+            --text-main: #09090c;
+            --text-muted: #8e8e9e;
+            --input-bg: #eaeaea;
+
+            --danger: #e62e22;
+            --danger-subtle: rgba(230, 46, 34, 0.08);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            outline: none;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text-main);
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: clamp(1rem, 3vw, 2rem) clamp(0.75rem, 3vw, 1.5rem) clamp(3rem, 6vw, 5rem);
+            transition: background-color 0.2s ease, color 0.2s ease;
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
+        }
+
+        .app-viewport {
+            width: 100%;
+            max-width: 1000px;
+            display: flex;
+            flex-direction: column;
+            gap: clamp(1.25rem, 3vw, 2.5rem);
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: clamp(0.6rem, 2vw, 0.85rem) 0;
+            background: transparent;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 800;
+            font-size: clamp(1.1rem, 2.5vw, 1.25rem);
+            letter-spacing: -0.04em;
+        }
+
+        .brand-dot {
+            color: var(--pink-primary);
+        }
+
+        .brand-pill {
+            background: var(--pink-subtle);
+            color: var(--pink-primary);
+            font-size: 0.65rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 20px;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .nav-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .net-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            padding: 0.4rem 0.65rem;
+            background: var(--surface-1);
+            border-radius: 20px;
+        }
+
+        .net-dot {
+            width: 6px;
+            height: 6px;
+            background-color: #10b981;
+            border-radius: 50%;
+        }
+
+        .eth-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.72rem;
+            color: var(--pink-primary);
+            padding: 0.4rem 0.65rem;
+            background: var(--pink-subtle);
+            border-radius: 20px;
+            font-weight: 700;
+        }
+
+        .btn {
+            background: var(--pink-primary);
+            color: #ffffff;
+            border: none;
+            padding: 0.65rem 1.15rem;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 0.825rem;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            white-space: nowrap;
+            touch-action: manipulation;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 24px var(--pink-glow);
+            filter: brightness(1.06);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: var(--surface-1);
+            color: var(--text-main);
+        }
+
+        .btn-secondary:hover {
+            background: var(--surface-hover);
+            box-shadow: none;
+        }
+
+        .btn-danger {
+            background: var(--danger-subtle);
+            color: var(--danger);
+        }
+
+        .btn-danger:hover {
+            background: var(--danger);
+            color: #ffffff;
+            box-shadow: 0 8px 20px rgba(255, 59, 48, 0.25);
+        }
+
+        .btn-export {
+            background: var(--surface-2);
+            color: var(--pink-primary);
+            padding: 0.55rem 0.85rem;
+            font-size: 0.75rem;
+        }
+
+        .btn-export:hover {
+            background: var(--pink-subtle);
+        }
+
+        /* Hero Vault - Borderless & Seamless */
+        .hero-vault {
+            background: transparent;
+            padding: clamp(1rem, 4vw, 2.5rem) 0;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+
+        .piggy-avatar-wrapper {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .piggy-avatar-glow {
+            position: absolute;
+            width: clamp(90px, 18vw, 130px);
+            height: clamp(90px, 18vw, 130px);
+            background: var(--pink-primary);
+            opacity: 0.18;
+            filter: blur(45px);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        .piggy-avatar {
+            font-size: clamp(4.5rem, 12vw, 7.5rem);
+            line-height: 1;
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+            z-index: 2;
+            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+            display: inline-block;
+        }
+
+        .piggy-avatar:hover {
+            transform: scale(1.08) rotate(3deg);
+        }
+
+        .piggy-avatar:active,
+        .piggy-avatar.oink-anim {
+            transform: scale(0.86) rotate(-8deg);
+        }
+
+        .hero-vault h1 {
+            font-size: clamp(1.8rem, 5vw, 2.5rem);
+            font-weight: 800;
+            letter-spacing: -0.04em;
+            margin-bottom: 0.4rem;
+        }
+
+        .hero-vault p {
+            color: var(--text-muted);
+            max-width: 500px;
+            font-size: clamp(0.85rem, 2vw, 0.95rem);
+            line-height: 1.6;
+            margin-bottom: 1.5rem;
+            padding: 0 0.5rem;
+        }
+
+        .mint-stats-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+            gap: 0.75rem;
+            width: 100%;
+            max-width: 600px;
+            margin-bottom: 1.5rem;
+            background: var(--surface-1);
+            padding: 0.85rem 1rem;
+            border-radius: 16px;
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.2rem;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 0.65rem;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .stat-value {
+            font-size: clamp(0.825rem, 2vw, 0.92rem);
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            color: var(--pink-primary);
+        }
+
+        /* Quantity Selector Component */
+        .mint-controls-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.85rem;
+            width: 100%;
+            max-width: 340px;
+        }
+
+        .qty-selector {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--surface-1);
+            padding: 0.35rem 0.5rem;
+            border-radius: 14px;
+            width: 100%;
+        }
+
+        .qty-btn {
+            background: var(--surface-2);
+            color: var(--text-main);
+            border: none;
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            font-size: 1.2rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.15s ease;
+        }
+
+        .qty-btn:hover {
+            background: var(--surface-hover);
+            color: var(--pink-primary);
+        }
+
+        .qty-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .qty-info {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .qty-num {
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: var(--text-main);
+        }
+
+        .qty-subtext {
+            font-size: 0.62rem;
+            color: var(--text-muted);
+        }
+
+        /* Slop Pot Metre Positioned Below Mint CTA */
+        .slop-pot-wrapper {
+            width: 100%;
+            max-width: 480px;
+            background: var(--surface-1);
+            border-radius: 20px;
+            padding: 1.25rem;
+            margin-top: 1.75rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.85rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .slop-pot-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .slop-pot-title {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--pink-primary);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .slop-pot-val {
+            font-size: 1.2rem;
+            font-weight: 800;
+            color: var(--text-main);
+        }
+
+        .slop-pot-metre {
+            width: 100%;
+            height: 12px;
+            background: var(--bg);
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .slop-pot-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #ff0055 0%, #ff5500 100%);
+            border-radius: 10px;
+            transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 0 12px var(--pink-glow);
+        }
+
+        .section-header {
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            margin-bottom: 0.85rem;
+            font-family: 'JetBrains Mono', monospace;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* Side-Scrolling Piggy Gallery UI */
+        .gallery-wrapper {
+            position: relative;
+            width: 100%;
+            display: flex;
+            align-items: center;
+        }
+
+        .gallery-nav-btn {
+            position: absolute;
+            z-index: 10;
+            background: var(--surface-1);
+            border: none;
+            color: var(--text-main);
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .gallery-nav-btn:hover {
+            color: var(--pink-primary);
+            background: var(--surface-hover);
+        }
+
+        .gallery-nav-btn.prev {
+            left: -12px;
+        }
+
+        .gallery-nav-btn.next {
+            right: -12px;
+        }
+
+        .slider-container {
+            display: flex;
+            gap: 1rem;
+            overflow-x: auto;
+            scroll-behavior: smooth;
+            padding: 0.5rem 0.25rem 1rem;
+            scrollbar-width: none;
+            -webkit-overflow-scrolling: touch;
+            width: 100%;
+        }
+
+        .slider-container::-webkit-scrollbar {
+            display: none;
+        }
+
+        .vault-card {
+            flex: 0 0 clamp(220px, 32vw, 250px);
+            background: var(--surface-1);
+            border-radius: 18px;
+            padding: 1rem;
+            cursor: pointer;
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            touch-action: manipulation;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .vault-card:hover {
+            transform: translateY(-3px);
+            background: var(--surface-hover);
+        }
+
+        .vault-card.active {
+            background: var(--surface-2);
+            box-shadow: 0 0 0 2px var(--pink-primary);
+        }
+
+        .vault-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .vault-id {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 800;
+            font-size: 1.1rem;
+            color: var(--pink-primary);
+        }
+
+        .vault-art-preview {
+            width: 100%;
+            aspect-ratio: 1/1;
+            background: var(--bg);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .vault-art-preview img,
+        .vault-art-preview svg {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            border-radius: 12px;
+        }
+
+        /* Expanded Inspection Drawer */
+        .drawer-panel {
+            background: var(--surface-1);
+            border-radius: 20px;
+            padding: clamp(1.25rem, 3vw, 1.75rem);
+            display: none;
+            flex-direction: column;
+            gap: 1.25rem;
+            margin-top: 1rem;
+            animation: fadeIn 0.25s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-6px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .drawer-panel.open {
+            display: flex;
+        }
+
+        .drawer-content-grid {
+            display: grid;
+            grid-template-columns: minmax(220px, 280px) 1fr;
+            gap: 1.5rem;
+        }
+
+        @media (max-width: 720px) {
+            .drawer-content-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .drawer-art-display {
+            width: 100%;
+            aspect-ratio: 1/1;
+            background: var(--bg);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .drawer-art-display img,
+        .drawer-art-display svg {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .drawer-info-side {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+
+        .drawer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 1rem;
+            border-bottom: 1px solid var(--surface-2);
+            padding-bottom: 1rem;
+        }
+
+        .drawer-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .smash-yield-badge {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            background: var(--pink-subtle);
+            color: var(--pink-primary);
+            padding: 0.4rem 0.8rem;
+            border-radius: 8px;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .asset-segment-title {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-bottom: 0.4rem;
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .asset-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(min(100%, 180px), 1fr));
+            gap: 0.75rem;
+        }
+
+        .asset-item {
+            background: var(--surface-2);
+            border-radius: 12px;
+            padding: 0.85rem 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            word-break: break-all;
+        }
+
+        .asset-item-img {
+            width: 42px;
+            height: 42px;
+            border-radius: 8px;
+            object-fit: cover;
+            background: var(--bg);
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .asset-item-img img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .preset-pills {
+            display: flex;
+            gap: 0.4rem;
+            margin-top: 0.4rem;
+            flex-wrap: wrap;
+        }
+
+        .preset-pill {
+            background: var(--surface-2);
+            color: var(--text-main);
+            border: none;
+            padding: 0.25rem 0.6rem;
+            border-radius: 6px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .preset-pill:hover {
+            background: var(--pink-subtle);
+            color: var(--pink-primary);
+        }
+
+        .bento-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+            gap: 1.25rem;
+        }
+
+        .bento-card {
+            background: var(--surface-1);
+            border-radius: 20px;
+            padding: clamp(1.25rem, 3vw, 1.75rem);
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+        .bento-card h3 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            letter-spacing: -0.01em;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+
+        .form-group label {
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            font-family: 'JetBrains Mono', monospace;
+            letter-spacing: 0.05em;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .info-hint {
+            font-size: 0.68rem;
+            color: var(--pink-primary);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        select,
+        input {
+            background: var(--input-bg);
+            border: none;
+            border-radius: 10px;
+            padding: 0.8rem 1rem;
+            color: var(--text-main);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            transition: background-color 0.2s ease;
+            width: 100%;
+        }
+
+        select:focus,
+        input:focus {
+            background: var(--surface-2);
+        }
+
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(8px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            padding: 1rem;
+        }
+
+        .modal-card {
+            background: var(--surface-1);
+            border-radius: 24px;
+            padding: clamp(1.25rem, 4vw, 2rem);
+            width: min(380px, 100%);
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
+        }
+
+        .wallet-btn {
+            background: var(--surface-2);
+            border-radius: 12px;
+            padding: 1rem 1.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: background 0.2s ease;
+            touch-action: manipulation;
+        }
+
+        .wallet-btn:hover {
+            background: var(--surface-hover);
+            color: var(--pink-primary);
+        }
+
+        .toast {
+            position: fixed;
+            bottom: clamp(1rem, 3vw, 2rem);
+            right: clamp(1rem, 3vw, 2rem);
+            background: var(--surface-1);
+            border-radius: 14px;
+            padding: 0.85rem 1.25rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+            display: none;
+            align-items: center;
+            gap: 0.75rem;
+            z-index: 99;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.825rem;
+            color: var(--text-main);
+            max-width: calc(100vw - 2rem);
+            word-break: break-word;
+            border: 1px solid var(--surface-2);
+        }
+
+        @media (max-width: 600px) {
+            header {
+                justify-content: center;
+            }
+
+            .brand {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .nav-actions {
+                width: 100%;
+                justify-content: space-between;
+            }
+
+            .toast {
+                left: 1rem;
+                right: 1rem;
+                bottom: 1rem;
+                justify-content: center;
+                text-align: center;
+            }
+
+            .drawer-actions {
+                width: 100%;
+                justify-content: space-between;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="app-viewport">
+        <!-- Header Nav -->
+        <header>
+            <div class="brand">
+                <span>piggy<span class="brand-dot">.</span></span>
+                <span class="brand-pill">v1.0</span>
+            </div>
+            <div class="nav-actions">
+                <div class="eth-badge" id="navEthBalance">
+                    <span>Ξ</span> <span id="ethVal">0.0000 ETH</span>
+                </div>
+                <div class="net-indicator">
+                    <span class="net-dot"></span>
+                    <span id="networkName">Sepolia</span>
+                </div>
+                <button class="btn btn-secondary" id="themeToggleBtn" style="padding: 0.55rem 0.85rem;">☀️</button>
+                <button class="btn" id="connectWalletBtn">Connect Wallet</button>
+            </div>
+        </header>
+
+        <!-- Hero Vault Header -->
+        <section class="hero-vault">
+            <div class="piggy-avatar-wrapper">
+                <div class="piggy-avatar-glow"></div>
+                <div class="piggy-avatar" id="piggyClicker" title="Click to oink">🐷</div>
+            </div>
+
+            <h1>piggy<span class="brand-dot">.</span></h1>
+            <p>ERC-7401 asset stash. Lock tokens & child NFTs inside containers. Smash to claim locked assets + your
+                share of the Slop Pot.</p>
+
+            <div class="mint-stats-bar">
+                <div class="stat-item">
+                    <span class="stat-label">Mint Price</span>
+                    <span class="stat-value" id="statMintPrice">0.0005 ETH</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Minted Total</span>
+                    <span class="stat-value" id="statMintedTotal">0 / 10,000</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Your Wallet</span>
+                    <span class="stat-value" id="statWalletAllowance">0 / 10</span>
+                </div>
+            </div>
+
+            <!-- Mint Quantity Control & Action -->
+            <div class="mint-controls-container">
+                <div class="qty-selector">
+                    <button class="qty-btn" id="qtyDecBtn" aria-label="Decrease quantity">-</button>
+                    <div class="qty-info">
+                        <span class="qty-num" id="qtyDisplay">1</span>
+                        <span class="qty-subtext">SELECT QUANTITY</span>
+                    </div>
+                    <button class="qty-btn" id="qtyIncBtn" aria-label="Increase quantity">+</button>
+                </div>
+
+                <button class="btn" id="heroMintBtn" style="font-size: 0.95rem; padding: 0.85rem 2.25rem; width: 100%;">
+                    Mint 1 piggy (0.0005 ETH)
+                </button>
+            </div>
+
+            <!-- Slop Pot Metre -->
+            <div class="slop-pot-wrapper">
+                <div class="slop-pot-header">
+                    <span class="slop-pot-title">🍲 Slop Pot Treasury</span>
+                    <span class="slop-pot-val" id="slopPotEth">0.0000 ETH</span>
+                </div>
+                <div class="slop-pot-metre">
+                    <div class="slop-pot-fill" id="slopPotFill"></div>
+                </div>
+                <div
+                    style="font-size: 0.7rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; text-align: left; width: 100%;">
+                    50% mint fees + 5% royalties locked inside vault. Claimed on Smash.
+                </div>
+            </div>
+        </section>
+
+        <!-- Side-Scrolling Piggy Gallery Section -->
+        <section>
+            <div class="section-header">
+                <span>piggy.units (<span id="piggyCount">0</span>)</span>
+            </div>
+
+            <div class="gallery-wrapper">
+                <button class="gallery-nav-btn prev" id="slideLeftBtn">&lsaquo;</button>
+                <div class="slider-container" id="piggySlider">
+                    <div
+                        style="color: var(--text-muted); font-size: 0.85rem; padding: 0.5rem 0; font-family: 'JetBrains Mono', monospace;">
+                        Connect wallet to scan owned piggies...
+                    </div>
+                </div>
+                <button class="gallery-nav-btn next" id="slideRightBtn">&rsaquo;</button>
+            </div>
+
+            <!-- Inspection, Smash & Export Panel (Popout View) -->
+            <div class="drawer-panel" id="piggyAccordion">
+                <div class="drawer-content-grid">
+                    <!-- Left Column: Onchain SVG Render -->
+                    <div class="drawer-art-display" id="drawerArtPreview">
+                        <span style="font-size: 3rem;">🐷</span>
+                    </div>
+
+                    <!-- Right Column: Metadata & Actions -->
+                    <div class="drawer-info-side">
+                        <div class="drawer-header">
+                            <div>
+                                <span
+                                    style="color: var(--text-muted); font-size: 0.72rem; font-family: 'JetBrains Mono', monospace; display: block;">CONTAINER
+                                    INSPECTION</span>
+                                <h4
+                                    style="font-family: 'JetBrains Mono', monospace; font-size: 1.35rem; font-weight: 800; margin-bottom: 0.35rem;">
+                                    piggy.#<span id="activePiggyId">--</span>
+                                </h4>
+                                <div class="smash-yield-badge">
+                                    <span>Estimated Smash Payout:</span>
+                                    <strong id="estimatedSmashYield">0.0000 ETH</strong>
+                                </div>
+                            </div>
+
+                            <div class="drawer-actions">
+                                <!-- Save Piggy Options -->
+                                <div style="display: flex; gap: 0.35rem; align-items: center;">
+                                    <button class="btn btn-export" onclick="exportPiggyImage('png')">💾 .PNG</button>
+                                    <button class="btn btn-export" onclick="exportPiggyImage('svg')">💾 .SVG</button>
+                                    <button class="btn btn-export" onclick="exportPiggyImage('jpg')">💾 .JPG</button>
+                                </div>
+                                <button class="btn btn-danger" id="smashActiveBtn">
+                                    💥 SMASH PIGGY.#<span id="smashBtnId">--</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; flex-direction: column; gap: 1rem;">
+                            <!-- Segment 1: Nested NFTs -->
+                            <div>
+                                <div class="asset-segment-title">
+                                    <span>🖼️ Nested NFTs</span>
+                                </div>
+                                <div class="asset-grid" id="stashNftsGrid">
+                                    <!-- Dynamically Loaded NFT Items -->
+                                </div>
+                            </div>
+
+                            <!-- Segment 2: Nested ERC-20 Tokens -->
+                            <div>
+                                <div class="asset-segment-title">
+                                    <span>🪙 Nested ERC-20 Tokens</span>
+                                </div>
+                                <div class="asset-grid" id="stashErc20sGrid">
+                                    <!-- Dynamically Loaded ERC20 Items -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Bento Grid Actions -->
+        <section class="bento-grid">
+            <!-- Action 1: Deposit ERC-20 -->
+            <div class="bento-card">
+                <div>
+                    <h3>Deposit Tokens</h3>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Lock ERC-20 token
+                        balances inside piggy.</p>
+                </div>
+
+                <div class="form-group">
+                    <label>Target piggy</label>
+                    <select id="depositPiggySelect">
+                        <option value="">Select Target</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>
+                        <span>Token Contract Address</span>
+                        <span class="info-hint" id="tokenDetectHint"></span>
+                    </label>
+                    <input type="text" id="tokenAddressInput" placeholder="0x... (ERC20 token)">
+                    <div class="preset-pills">
+                        <button type="button" class="preset-pill" onclick="setTokenPreset('ETH')">Deposit ETH</button>
+                        <button type="button" class="preset-pill" onclick="setTokenPreset('USDC')">Deposit USDC</button>
+                        <button type="button" class="preset-pill" onclick="setTokenPreset('WETH')">Deposit WETH</button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>
+                        <span>Amount (Natural Value)</span>
+                        <span class="info-hint" id="tokenBalanceHint"></span>
+                    </label>
+                    <input type="number" step="any" id="tokenAmountInput" placeholder="e.g. 10.5 or 100">
+                </div>
+
+                <button class="btn btn-secondary" id="depositTokenBtn">Deposit Tokens</button>
+            </div>
+
+            <!-- Action 2: Nest Child NFT -->
+            <div class="bento-card">
+                <div>
+                    <h3>Nest Child NFT</h3>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Nest an ERC-721 token
+                        into parent piggy.</p>
+                </div>
+
+                <div class="form-group">
+                    <label>Target Parent piggy</label>
+                    <select id="nestPiggySelect">
+                        <option value="">Select Target</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Child NFT Contract</label>
+                    <input type="text" id="childNftAddressInput" placeholder="0x... (ERC721 token)">
+                    <div id="childNftDetailsHint"
+                        style="font-size: 0.72rem; color: var(--pink-primary); font-family: 'JetBrains Mono', monospace; margin-top: 0.35rem; min-height: 1.1em;">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Child Token ID</label>
+                    <input type="number" id="childTokenIdInput" placeholder="1">
+                </div>
+
+                <button class="btn btn-secondary" id="nestNftBtn">Nest NFT</button>
+            </div>
+        </section>
+    </div>
+
+    <!-- Wallet Modal -->
+    <div class="modal-backdrop" id="walletModal">
+        <div class="modal-card">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="font-size: 1.05rem; font-weight: 700; font-family: 'JetBrains Mono', monospace;">
+                    connect_wallet</h3>
+                <span style="cursor: pointer; font-size: 1.25rem; color: var(--text-muted);"
+                    id="closeModal">&times;</span>
+            </div>
+            <div class="wallet-btn" onclick="connectWallet('injected')">
+                <span>MetaMask / Injected</span>
+                <span>🦊</span>
+            </div>
+            <div class="wallet-btn" onclick="connectWallet('coinbase')">
+                <span>Coinbase Wallet</span>
+                <span>🔵</span>
+            </div>
+            <div class="wallet-btn" onclick="connectWallet('rabby')">
+                <span>Rabby Wallet</span>
+                <span>🐰</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Banner -->
+    <div class="toast" id="toastLog">
+        <span id="toastMessage">Ready</span>
+    </div>
+
+    <script>
+        const REAL_PIG_OINK_BASE64 = "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAGAACAgoSFhoiIiIuMjY2OlJSVlpaXmJmZnJ2enp+goaGio6Slpqeoqauur6axs7S0trq6vLu8vb7AwcLExsfIyc3Oz9DR0tTV1tfY2drb3N3e3+Di4+Tl5ufo6err7O3u7/Dx8vP09fb3+Pn6+/z9/v8AAI";
+
+        const SEPOLIA_CHAIN_ID = "0xaa36a7";
+        const CONTRACT_ADDRESS = "0x14dB58832E9A3F534a8c43f39D4E5a1514f4B906";
+
+        // Hardcoded Sepolia Token Addresses for presets
+        const HARDCODED_TOKENS = {
+            ETH: "0xfff9976782d46cc05630d1f6ebab18b2324d6b14", // Native ETH maps to Sepolia WETH for ERC20 vault operations
+            USDC: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238", // Sepolia USDC
+            WETH: "0xfff9976782d46cc05630d1f6ebab18b2324d6b14"  // Sepolia WETH
+        };
+
+        const PIGGY_ABI = [
+            "function mintPiggy(address to, uint256 quantity) external payable returns (uint256[])",
+            "function mintPiggy(address to) external payable returns (uint256)",
+            "function mintPiggyBatch(address to, uint256 quantity) external payable returns (uint256[])",
+            "function depositERC20(uint256 piggyId, address tokenAddress, uint256 amount) external",
+            "function nestNFT(uint256 parentPiggyId, address childContract, uint256 childTokenId) external",
+            "function childrenOf(uint256 parentTokenId) external view returns (tuple(uint256 tokenId, address contractAddress)[])",
+            "function smashPiggy(uint256 piggyId, address[] calldata tokensToWithdraw) external",
+            "function ownerOf(uint256 tokenId) external view returns (address)",
+            "function activeSupply() external view returns (uint256)",
+            "function totalSupply() external view returns (uint256)",
+            "function tokenURI(uint256 tokenId) external view returns (string)",
+            "function MAX_SUPPLY() external view returns (uint256)",
+            "function MAX_PER_WALLET() external view returns (uint256)",
+            "function MINT_PRICE() external view returns (uint256)",
+            "function mintedPerWallet(address account) external view returns (uint256)",
+            "function erc20Balances(uint256 piggyId, address token) external view returns (uint256)",
+            "function piggyERC20Balance(uint256 piggyId, address token) external view returns (uint256)",
+            "function tokenBalance(uint256 piggyId, address token) external view returns (uint256)"
+        ];
+
+        const ERC20_ABI = [
+            "function approve(address spender, uint256 amount) external returns (bool)",
+            "function allowance(address owner, address spender) external view returns (uint256)",
+            "function decimals() external view returns (uint8)",
+            "function symbol() external view returns (string)",
+            "function balanceOf(address account) external view returns (uint256)"
+        ];
+
+        const ERC721_ABI = [
+            "function name() external view returns (string)",
+            "function symbol() external view returns (string)",
+            "function approve(address to, uint256 tokenId) external",
+            "function getApproved(uint256 tokenId) external view returns (address)",
+            "function tokenURI(uint256 tokenId) external view returns (string)",
+            "function uri(uint256 tokenId) external view returns (string)"
+        ];
+
+        let provider, signer, piggyContract;
+        let userAddress = null;
+        let ownedPiggies = [];
+        let piggyDataCache = {};
+        let nftImageCache = {};
+        let trackedErc20Tokens = new Set([
+            HARDCODED_TOKENS.USDC.toLowerCase(),
+            HARDCODED_TOKENS.WETH.toLowerCase()
+        ]);
+        let selectedPiggyId = null;
+        let globalVaultEthBalance = 0n;
+        let globalTotalSupply = 0n;
+        let globalActiveSupply = 0n;
+        let singleMintPriceWei = ethers.parseEther("0.0005");
+        let activeTokenDecimals = 18;
+        let activeTokenSymbol = "";
+
+        // Mint Stepper State
+        let selectedMintQty = 1;
+        let userMintedCount = 0;
+        const MAX_PER_WALLET_CAP = 10;
+
+        const themeToggleBtn = document.getElementById('themeToggleBtn');
+        const walletModal = document.getElementById('walletModal');
+        const toastLog = document.getElementById('toastLog');
+        const toastMessage = document.getElementById('toastMessage');
+        const connectWalletBtn = document.getElementById('connectWalletBtn');
+        const piggyClicker = document.getElementById('piggyClicker');
+
+        // Quantity controls
+        const qtyDecBtn = document.getElementById('qtyDecBtn');
+        const qtyIncBtn = document.getElementById('qtyIncBtn');
+        const qtyDisplay = document.getElementById('qtyDisplay');
+        const heroMintBtn = document.getElementById('heroMintBtn');
+
+        // Gallery nav controls
+        document.getElementById('slideLeftBtn').addEventListener('click', () => {
+            document.getElementById('piggySlider').scrollBy({ left: -220, behavior: 'smooth' });
+        });
+        document.getElementById('slideRightBtn').addEventListener('click', () => {
+            document.getElementById('piggySlider').scrollBy({ left: 220, behavior: 'smooth' });
+        });
+
+        themeToggleBtn.addEventListener('click', () => {
+            const currentTheme = document.documentElement.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', newTheme);
+            themeToggleBtn.innerText = newTheme === 'dark' ? '☀️' : '🌙';
+        });
+
+        function showToast(msg) {
+            toastMessage.innerText = msg;
+            toastLog.style.display = "flex";
+            setTimeout(() => { toastLog.style.display = "none"; }, 4000);
+        }
+
+        function playPigSound() {
+            try {
+                const audio = new Audio(REAL_PIG_OINK_BASE64);
+                audio.volume = 0.85;
+                audio.play().catch(() => {
+                    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sawtooth';
+                    const now = audioCtx.currentTime;
+                    osc.frequency.setValueAtTime(340, now);
+                    osc.frequency.exponentialRampToValueAtTime(130, now + 0.14);
+                    osc.frequency.linearRampToValueAtTime(210, now + 0.24);
+                    osc.frequency.exponentialRampToValueAtTime(65, now + 0.38);
+                    gain.gain.setValueAtTime(0.28, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.38);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.38);
+                });
+            } catch (e) {
+                console.warn("Audio unavailable", e);
+            }
+        }
+
+        piggyClicker.addEventListener('click', () => {
+            playPigSound();
+            piggyClicker.classList.add('oink-anim');
+            setTimeout(() => piggyClicker.classList.remove('oink-anim'), 180);
+            showToast("oink! 🐷");
+        });
+
+        function updateQtyUI() {
+            const maxAllowed = Math.max(0, MAX_PER_WALLET_CAP - userMintedCount);
+
+            if (maxAllowed === 0) {
+                selectedMintQty = 0;
+                qtyDisplay.innerText = "0";
+                heroMintBtn.innerText = "Wallet Cap Reached (10/10)";
+                heroMintBtn.disabled = true;
+                qtyIncBtn.disabled = true;
+                qtyDecBtn.disabled = true;
+                return;
+            }
+
+            if (selectedMintQty > maxAllowed) selectedMintQty = maxAllowed;
+            if (selectedMintQty < 1) selectedMintQty = 1;
+
+            qtyDisplay.innerText = selectedMintQty;
+            qtyDecBtn.disabled = selectedMintQty <= 1;
+            qtyIncBtn.disabled = selectedMintQty >= maxAllowed;
+
+            const totalCostWei = singleMintPriceWei * BigInt(selectedMintQty);
+            const totalEthStr = parseFloat(ethers.formatEther(totalCostWei)).toFixed(4);
+
+            heroMintBtn.disabled = false;
+            heroMintBtn.innerText = `Mint ${selectedMintQty} piggy (${totalEthStr} ETH)`;
+        }
+
+        qtyDecBtn.addEventListener('click', () => {
+            if (selectedMintQty > 1) {
+                selectedMintQty--;
+                updateQtyUI();
+            }
+        });
+
+        qtyIncBtn.addEventListener('click', () => {
+            const maxAllowed = MAX_PER_WALLET_CAP - userMintedCount;
+            if (selectedMintQty < maxAllowed) {
+                selectedMintQty++;
+                updateQtyUI();
+            }
+        });
+
+        // Set Hardcoded Token Address Presets
+        function setTokenPreset(symbol) {
+            const tokenInput = document.getElementById('tokenAddressInput');
+            if (symbol === 'ETH') {
+                showToast("Notice: ERC20 deposits require WETH. Address auto-set to Sepolia WETH.");
+            }
+            if (HARDCODED_TOKENS[symbol]) {
+                tokenInput.value = HARDCODED_TOKENS[symbol];
+                tokenInput.dispatchEvent(new Event('input'));
+            }
+        }
+
+        // Toggle Connect / Disconnect Wallet Button Functionality
+        connectWalletBtn.addEventListener('click', () => {
+            if (userAddress) {
+                disconnectWallet();
+            } else {
+                walletModal.style.display = "flex";
+            }
+        });
+
+        function disconnectWallet() {
+            provider = null;
+            signer = null;
+            userAddress = null;
+            ownedPiggies = [];
+            selectedPiggyId = null;
+
+            localStorage.removeItem('piggy_wallet_connected');
+            localStorage.removeItem('piggy_wallet_type');
+
+            connectWalletBtn.innerText = "Connect Wallet";
+            document.getElementById('ethVal').innerText = "0.0000 ETH";
+            document.getElementById('piggyCount').innerText = "0";
+            document.getElementById('piggySlider').innerHTML = `
+                <div style="color: var(--text-muted); font-size: 0.85rem; padding: 0.5rem 0; font-family: 'JetBrains Mono', monospace;">
+                    Connect wallet to scan owned piggies...
+                </div>`;
+            document.getElementById('piggyAccordion').classList.remove('open');
+            updateSelectDropdowns();
+            showToast("Wallet disconnected");
+        }
+
+        document.getElementById('closeModal').addEventListener('click', () => { walletModal.style.display = "none"; });
+
+        async function forceSepoliaNetwork() {
+            if (!window.ethereum) return;
+            try {
+                await window.ethereum.request({
+                    method: 'wallet_switchEthereumChain',
+                    params: [{ chainId: SEPOLIA_CHAIN_ID }],
+                });
+            } catch (switchError) {
+                if (switchError.code === 4902) {
+                    await window.ethereum.request({
+                        method: 'wallet_addEthereumChain',
+                        params: [{
+                            chainId: SEPOLIA_CHAIN_ID,
+                            chainName: 'Sepolia Testnet',
+                            nativeCurrency: { name: 'Sepolia ETH', symbol: 'ETH', decimals: 18 },
+                            rpcUrls: ['https://rpc.sepolia.org'],
+                            blockExplorerUrls: ['https://sepolia.etherscan.io']
+                        }],
+                    });
+                }
+            }
+        }
+
+        async function connectWallet(providerType = 'injected', isAutoConnect = false) {
+            walletModal.style.display = "none";
+
+            if (typeof window.ethers === "undefined") {
+                return showToast("Ethers.js library failed to load. Check CDN connection.");
+            }
+
+            if (!window.ethereum) {
+                if (!isAutoConnect) showToast("No wallet provider detected!");
+                return;
+            }
+
+            try {
+                if (!isAutoConnect) await forceSepoliaNetwork();
+                provider = new ethers.BrowserProvider(window.ethereum);
+                signer = await provider.getSigner();
+                userAddress = await signer.getAddress();
+
+                piggyContract = new ethers.Contract(CONTRACT_ADDRESS, PIGGY_ABI, signer);
+
+                localStorage.setItem('piggy_wallet_connected', 'true');
+                localStorage.setItem('piggy_wallet_type', providerType);
+
+                connectWalletBtn.innerText = `${userAddress.substring(0, 6)}...${userAddress.substring(38)}`;
+                if (!isAutoConnect) showToast(`Connected: ${userAddress.substring(0, 6)}`);
+
+                window.ethereum.on('accountsChanged', (accounts) => {
+                    if (accounts.length === 0) {
+                        disconnectWallet();
+                    } else {
+                        connectWallet(providerType);
+                    }
+                });
+
+                window.ethereum.on('chainChanged', () => {
+                    window.location.reload();
+                });
+
+                await fetchUserEthBalance();
+                await refreshProtocolStats();
+                await scanUserPiggies();
+            } catch (err) {
+                if (!isAutoConnect) showToast(`Connection error: ${err.reason || err.message}`);
+            }
+        }
+
+        // Auto-connect on page reload if previously connected
+        window.addEventListener('DOMContentLoaded', () => {
+            const isConnected = localStorage.getItem('piggy_wallet_connected');
+            const walletType = localStorage.getItem('piggy_wallet_type') || 'injected';
+            if (isConnected === 'true') {
+                connectWallet(walletType, true);
+            }
+        });
+
+        async function fetchUserEthBalance() {
+            if (!provider || !userAddress) return;
+            try {
+                const bal = await provider.getBalance(userAddress);
+                const ethStr = parseFloat(ethers.formatEther(bal)).toFixed(4);
+                document.getElementById('ethVal').innerText = `${ethStr} ETH`;
+            } catch (e) {
+                console.warn("Could not fetch user ETH balance", e);
+            }
+        }
+
+        // Refresh token balances for the deposit field UI
+        async function updateTokenBalanceHint() {
+            const addr = document.getElementById('tokenAddressInput').value.trim();
+            const detectHint = document.getElementById('tokenDetectHint');
+            const balHint = document.getElementById('tokenBalanceHint');
+
+            if (!ethers.isAddress(addr) || !provider) {
+                detectHint.innerText = "";
+                balHint.innerText = "";
+                activeTokenDecimals = 18;
+                return;
+            }
+
+            try {
+                detectHint.innerText = "Scanning...";
+                const erc20 = new ethers.Contract(addr, ERC20_ABI, provider);
+                const [sym, dec, bal] = await Promise.all([
+                    erc20.symbol().catch(() => "TOK"),
+                    erc20.decimals().catch(() => 18),
+                    userAddress ? erc20.balanceOf(userAddress).catch(() => 0n) : 0n
+                ]);
+
+                activeTokenDecimals = Number(dec);
+                activeTokenSymbol = sym;
+
+                const formattedBal = parseFloat(ethers.formatUnits(bal, dec)).toFixed(4);
+                detectHint.innerText = `${sym} (${dec} dec)`;
+                balHint.innerText = userAddress ? `Wallet: ${formattedBal} ${sym}` : "";
+            } catch (err) {
+                detectHint.innerText = "Invalid ERC20";
+                balHint.innerText = "";
+                activeTokenDecimals = 18;
+            }
+        }
+
+        // Scan and display child NFT collection name & symbol
+        async function updateChildNftHint() {
+            const addr = document.getElementById('childNftAddressInput').value.trim();
+            const detailsHint = document.getElementById('childNftDetailsHint');
+
+            if (!ethers.isAddress(addr)) {
+                detailsHint.innerText = "";
+                return;
+            }
+
+            try {
+                detailsHint.innerText = "Scanning NFT Collection...";
+                const activeProv = provider || new ethers.JsonRpcProvider("https://rpc.sepolia.org");
+                const nftContract = new ethers.Contract(addr, ERC721_ABI, activeProv);
+
+                const [name, symbol] = await Promise.all([
+                    nftContract.name().catch(() => null),
+                    nftContract.symbol().catch(() => null)
+                ]);
+
+                if (name || symbol) {
+                    detailsHint.innerText = `📦 ${name || 'Unknown Collection'} (${symbol || '---'})`;
+                } else {
+                    detailsHint.innerText = "⚠️ Could not read NFT details";
+                }
+            } catch (err) {
+                detailsHint.innerText = "⚠️ Invalid ERC721 Contract";
+            }
+        }
+
+        // Event listeners for inputs
+        document.getElementById('tokenAddressInput').addEventListener('input', updateTokenBalanceHint);
+        document.getElementById('childNftAddressInput').addEventListener('input', updateChildNftHint);
+
+        async function refreshProtocolStats() {
+            if (!piggyContract || !provider) return;
+            try {
+                globalTotalSupply = await piggyContract.totalSupply();
+                document.getElementById('statMintedTotal').innerText = `${globalTotalSupply.toString()} / 10,000`;
+
+                try {
+                    globalActiveSupply = await piggyContract.activeSupply();
+                } catch (e) {
+                    globalActiveSupply = globalTotalSupply;
+                }
+
+                try {
+                    singleMintPriceWei = await piggyContract.MINT_PRICE();
+                    const priceFormatted = ethers.formatEther(singleMintPriceWei);
+                    document.getElementById('statMintPrice').innerText = `${priceFormatted} ETH`;
+                } catch (e) {
+                    singleMintPriceWei = ethers.parseEther("0.0005");
+                }
+
+                globalVaultEthBalance = await provider.getBalance(CONTRACT_ADDRESS);
+                const ethFormatted = ethers.formatEther(globalVaultEthBalance);
+                document.getElementById('slopPotEth').innerText = `${parseFloat(ethFormatted).toFixed(4)} ETH`;
+
+                const targetCap = ethers.parseEther("2.5");
+                let percentage = Number((globalVaultEthBalance * 100n) / (targetCap > 0n ? targetCap : 1n));
+                if (percentage > 100) percentage = 100;
+                document.getElementById('slopPotFill').style.width = `${Math.max(percentage, 2)}%`;
+
+                if (userAddress) {
+                    const mintedBN = await piggyContract.mintedPerWallet(userAddress);
+                    userMintedCount = Number(mintedBN);
+                    document.getElementById('statWalletAllowance').innerText = `${userMintedCount} / 10`;
+                }
+
+                updateQtyUI();
+            } catch (e) {
+                console.warn("Contract query pending initialization.", e);
+            }
+        }
+
+        async function fetchOnchainPiggyMetadata(tokenId) {
+            if (piggyDataCache[tokenId]) return piggyDataCache[tokenId];
+            try {
+                const tokenUri = await piggyContract.tokenURI(tokenId);
+                const base64Json = tokenUri.replace("data:application/json;base64,", "");
+                const jsonStr = atob(base64Json);
+                const metadata = JSON.parse(jsonStr);
+
+                const svgImageUri = metadata.image;
+                const base64Svg = svgImageUri.replace("data:image/svg+xml;base64,", "");
+                const rawSvg = atob(base64Svg);
+
+                piggyDataCache[tokenId] = {
+                    metadata,
+                    imageUri: svgImageUri,
+                    rawSvg
+                };
+                return piggyDataCache[tokenId];
+            } catch (err) {
+                console.warn(`Failed to parse onchain SVG for Piggy #${tokenId}`, err);
+                return null;
+            }
+        }
+
+        async function fetchChildNftImage(contractAddress, tokenId) {
+            const key = `${contractAddress.toLowerCase()}_${tokenId}`;
+            if (nftImageCache[key]) return nftImageCache[key];
+
+            try {
+                const nftContract = new ethers.Contract(contractAddress, ERC721_ABI, provider);
+                let uri = "";
+                try {
+                    uri = await nftContract.tokenURI(tokenId);
+                } catch (e) {
+                    uri = await nftContract.uri(tokenId);
+                }
+
+                if (!uri) return null;
+
+                let imageUrl = "";
+
+                if (uri.startsWith("data:application/json;base64,")) {
+                    const jsonStr = atob(uri.replace("data:application/json;base64,", ""));
+                    const meta = JSON.parse(jsonStr);
+                    imageUrl = meta.image || meta.image_url || "";
+                } else if (uri.startsWith("ipfs://")) {
+                    uri = uri.replace("ipfs://", "https://ipfs.io/ipfs/");
+                    const res = await fetch(uri);
+                    const meta = await res.json();
+                    imageUrl = meta.image || meta.image_url || "";
+                } else if (uri.startsWith("http")) {
+                    const res = await fetch(uri);
+                    const meta = await res.json();
+                    imageUrl = meta.image || meta.image_url || "";
+                }
+
+                if (imageUrl.startsWith("ipfs://")) {
+                    imageUrl = imageUrl.replace("ipfs://", "https://ipfs.io/ipfs/");
+                }
+
+                if (imageUrl) {
+                    nftImageCache[key] = imageUrl;
+                    return imageUrl;
+                }
+            } catch (err) {
+                console.warn(`Could not resolve image for NFT ${contractAddress} #${tokenId}`, err);
+            }
+            return null;
+        }
+
+        async function scanUserPiggies() {
+            if (!piggyContract || !userAddress) return;
+            showToast("Scanning owned piggies onchain...");
+
+            ownedPiggies = [];
+            const slider = document.getElementById('piggySlider');
+            slider.innerHTML = "";
+
+            try {
+                for (let id = 1; id <= Number(globalTotalSupply); id++) {
+                    try {
+                        const owner = await piggyContract.ownerOf(id);
+                        if (owner.toLowerCase() === userAddress.toLowerCase()) {
+                            ownedPiggies.push(id);
+                        }
+                    } catch (e) { }
+                }
+            } catch (e) {
+                console.warn(e);
+            }
+
+            document.getElementById('piggyCount').innerText = ownedPiggies.length;
+            updateSelectDropdowns();
+
+            if (ownedPiggies.length === 0) {
+                slider.innerHTML = `<div style="color: var(--text-muted); font-size: 0.85rem; font-family: 'JetBrains Mono', monospace;">No piggies found in your wallet. Mint above.</div>`;
+                return;
+            }
+
+            ownedPiggies.forEach(id => {
+                const card = document.createElement('div');
+                card.className = `vault-card ${selectedPiggyId === id ? 'active' : ''}`;
+                card.onclick = () => selectPiggy(id);
+                card.innerHTML = `
+                    <div class="vault-card-header">
+                        <span class="vault-id">piggy.#${id}</span>
+                        <span style="font-size: 0.72rem; color: var(--pink-primary); font-family: 'JetBrains Mono', monospace;">ERC-7401</span>
+                    </div>
+                    <div class="vault-art-preview" id="preview-art-${id}">
+                        <span style="font-size: 2rem;">⏳</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.72rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;">
+                        <span>Container Vault</span>
+                        <span style="color: var(--pink-primary);">Inspect &rarr;</span>
+                    </div>
+                `;
+                slider.appendChild(card);
+
+                fetchOnchainPiggyMetadata(id).then(data => {
+                    const artBox = document.getElementById(`preview-art-${id}`);
+                    if (artBox && data) {
+                        artBox.innerHTML = `<img src="${data.imageUri}" alt="Piggy #${id}" />`;
+                    } else if (artBox) {
+                        artBox.innerHTML = `🐷`;
+                    }
+                });
+            });
+        }
+
+        function updateSelectDropdowns() {
+            const depSelect = document.getElementById('depositPiggySelect');
+            const nestSelect = document.getElementById('nestPiggySelect');
+
+            const prevDepVal = depSelect.value;
+            const prevNestVal = nestSelect.value;
+
+            depSelect.innerHTML = '<option value="">Select Target</option>';
+            nestSelect.innerHTML = '<option value="">Select Target</option>';
+
+            ownedPiggies.forEach(id => {
+                depSelect.innerHTML += `<option value="${id}">piggy.#${id}</option>`;
+                nestSelect.innerHTML += `<option value="${id}">piggy.#${id}</option>`;
+            });
+
+            if (ownedPiggies.includes(Number(prevDepVal))) depSelect.value = prevDepVal;
+            if (ownedPiggies.includes(Number(prevNestVal))) nestSelect.value = prevNestVal;
+        }
+
+        async function selectPiggy(id) {
+            selectedPiggyId = id;
+            document.getElementById('activePiggyId').innerText = id;
+            document.getElementById('smashBtnId').innerText = id;
+
+            try {
+                if (piggyContract) {
+                    globalActiveSupply = await piggyContract.activeSupply();
+                }
+            } catch (e) { }
+
+            if (globalActiveSupply > 0n && globalVaultEthBalance > 0n) {
+                const estBounty = globalVaultEthBalance / globalActiveSupply;
+                document.getElementById('estimatedSmashYield').innerText = `${parseFloat(ethers.formatEther(estBounty)).toFixed(5)} ETH`;
+            } else {
+                document.getElementById('estimatedSmashYield').innerText = "0.0000 ETH";
+            }
+
+            const drawer = document.getElementById('piggyAccordion');
+            drawer.classList.add('open');
+
+            document.querySelectorAll('.vault-card').forEach((c, idx) => {
+                if (ownedPiggies[idx] === id) {
+                    c.classList.add('active');
+                } else {
+                    c.classList.remove('active');
+                }
+            });
+
+            const drawerArtDisplay = document.getElementById('drawerArtPreview');
+            drawerArtDisplay.innerHTML = `<span style="font-size: 2.5rem;">⏳ Loading SVG...</span>`;
+
+            const cacheData = await fetchOnchainPiggyMetadata(id);
+            if (cacheData) {
+                drawerArtDisplay.innerHTML = `<img src="${cacheData.imageUri}" alt="Piggy #${id}" />`;
+            } else {
+                drawerArtDisplay.innerHTML = `<span style="font-size: 4rem;">🐷</span>`;
+            }
+
+            const nftsGrid = document.getElementById('stashNftsGrid');
+            const erc20sGrid = document.getElementById('stashErc20sGrid');
+
+            nftsGrid.innerHTML = `<div style="color: var(--text-muted); font-family: 'JetBrains Mono', monospace; grid-column: 1/-1;">Loading nested NFTs...</div>`;
+            erc20sGrid.innerHTML = `<div style="color: var(--text-muted); font-family: 'JetBrains Mono', monospace; grid-column: 1/-1;">Loading nested ERC-20s...</div>`;
+
+            // Load Segment 1: Nested Child NFTs
+            try {
+                const children = await piggyContract.childrenOf(id);
+                nftsGrid.innerHTML = "";
+
+                if (children.length === 0) {
+                    nftsGrid.innerHTML = `<div style="color: var(--text-muted); grid-column: 1/-1; font-family: 'JetBrains Mono', monospace;">No nested NFTs in piggy.#${id}.</div>`;
+                } else {
+                    children.forEach((c) => {
+                        const nftCardId = `child-nft-${c.contractAddress.substring(2, 6)}-${c.tokenId}`;
+                        nftsGrid.innerHTML += `
+                            <div class="asset-item">
+                                <div class="asset-item-img" id="${nftCardId}">
+                                    <span>🖼️</span>
+                                </div>
+                                <div>
+                                    <div style="font-weight: 700;">NFT #${c.tokenId.toString()}</div>
+                                    <div style="font-size: 0.7rem; color: var(--text-muted);">${c.contractAddress.substring(0, 8)}...</div>
+                                </div>
+                            </div>
+                        `;
+
+                        fetchChildNftImage(c.contractAddress, c.tokenId).then(imgUri => {
+                            const imgBox = document.getElementById(nftCardId);
+                            if (imgBox && imgUri) {
+                                imgBox.innerHTML = `<img src="${imgUri}" alt="NFT #${c.tokenId}" />`;
+                            }
+                        });
+                    });
+                }
+            } catch (err) {
+                nftsGrid.innerHTML = `<div style="color: var(--danger); font-family: 'JetBrains Mono', monospace; grid-column: 1/-1;">Failed to load nested NFTs.</div>`;
+            }
+
+            // Load Segment 2: Nested ERC-20 Tokens
+            try {
+                erc20sGrid.innerHTML = "";
+                let foundErc20 = false;
+
+                for (let tokenAddr of trackedErc20Tokens) {
+                    try {
+                        let tokenBal = 0n;
+                        try {
+                            tokenBal = await piggyContract.erc20Balances(id, tokenAddr);
+                        } catch (e1) {
+                            try {
+                                tokenBal = await piggyContract.piggyERC20Balance(id, tokenAddr);
+                            } catch (e2) {
+                                tokenBal = await piggyContract.tokenBalance(id, tokenAddr);
+                            }
+                        }
+
+                        if (tokenBal > 0n) {
+                            foundErc20 = true;
+                            const erc20 = new ethers.Contract(tokenAddr, ERC20_ABI, provider);
+                            const [symbol, dec] = await Promise.all([
+                                erc20.symbol().catch(() => "TOKEN"),
+                                erc20.decimals().catch(() => 18)
+                            ]);
+
+                            const formattedBal = parseFloat(ethers.formatUnits(tokenBal, dec)).toFixed(4);
+
+                            erc20sGrid.innerHTML += `
+                                <div class="asset-item">
+                                    <span style="font-size: 1.2rem;">🪙</span>
+                                    <div>
+                                        <div style="font-weight: 800; color: var(--pink-primary);">${formattedBal} ${symbol}</div>
+                                        <div style="font-size: 0.68rem; color: var(--text-muted);">${tokenAddr.substring(0, 8)}...</div>
+                                    </div>
+                                </div>
+                            `;
+                        }
+                    } catch (e) {
+                        console.warn(`Error reading ERC20 balance for token ${tokenAddr}`, e);
+                    }
+                }
+
+                if (!foundErc20) {
+                    erc20sGrid.innerHTML = `<div style="color: var(--text-muted); grid-column: 1/-1; font-family: 'JetBrains Mono', monospace;">No nested ERC-20 tokens in piggy.#${id}.</div>`;
+                }
+            } catch (err) {
+                erc20sGrid.innerHTML = `<div style="color: var(--danger); font-family: 'JetBrains Mono', monospace; grid-column: 1/-1;">Failed to load ERC-20 balances.</div>`;
+            }
+
+            drawer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        // Complete Auto-Refresh Handler across UI components
+        async function refreshAllBalancesAndViews() {
+            await fetchUserEthBalance();
+            await refreshProtocolStats();
+            await updateTokenBalanceHint();
+            await updateChildNftHint();
+            if (selectedPiggyId) {
+                await selectPiggy(selectedPiggyId);
+            }
+        }
+
+        async function exportPiggyImage(format) {
+            if (!selectedPiggyId) return showToast("Select a piggy first!");
+
+            const piggyId = selectedPiggyId;
+            showToast(`Generating piggy.#${piggyId}.${format}...`);
+
+            const data = await fetchOnchainPiggyMetadata(piggyId);
+            if (!data) return showToast("Metadata unavailable for export.");
+
+            const rawSvgText = data.rawSvg;
+
+            if (format === 'svg') {
+                const blob = new Blob([rawSvgText], { type: 'image/svg+xml;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `piggy-${piggyId}.svg`;
+                a.click();
+                URL.revokeObjectURL(url);
+                showToast(`Saved piggy.#${piggyId}.svg!`);
+                return;
+            }
+
+            const img = new Image();
+            const svgBlob = new Blob([rawSvgText], { type: 'image/svg+xml;charset=utf-8' });
+            const url = URL.createObjectURL(svgBlob);
+
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = 800;
+                canvas.height = 800;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, 800, 800);
+                URL.revokeObjectURL(url);
+
+                const mimeType = format === 'jpg' ? 'image/jpeg' : 'image/png';
+                const dataUrl = canvas.toDataURL(mimeType, 0.95);
+                const a = document.createElement('a');
+                a.href = dataUrl;
+                a.download = `piggy-${piggyId}.${format}`;
+                a.click();
+                showToast(`Saved piggy.#${piggyId}.${format}!`);
+            };
+            img.src = url;
+        }
+
+        heroMintBtn.addEventListener('click', async () => {
+            if (!piggyContract || !signer) return showToast("Connect wallet first!");
+
+            try {
+                playPigSound();
+
+                let price = singleMintPriceWei;
+                try {
+                    price = await piggyContract.MINT_PRICE();
+                    singleMintPriceWei = price;
+                } catch (e) {
+                    console.warn("Using cached MINT_PRICE", e);
+                }
+
+                const qty = selectedMintQty;
+                const totalValue = BigInt(price.toString()) * BigInt(qty);
+
+                showToast(`Initiating batch mint for ${qty} piggy unit(s)...`);
+
+                const tx = await piggyContract.mintPiggyBatch(userAddress, qty, {
+                    value: totalValue
+                });
+
+                showToast(`Awaiting block confirmation...`);
+                await tx.wait();
+
+                showToast(`Successfully minted ${qty} piggy container(s)! 🐷`);
+                await scanUserPiggies();
+                await refreshAllBalancesAndViews();
+            } catch (err) {
+                console.error("Batch mint execution failed:", err);
+
+                if (err.code === 'ACTION_REJECTED' || err.code === 4001) {
+                    showToast("Transaction cancelled by user.");
+                    return;
+                }
+
+                const reason = err.reason || err.shortMessage || err.message;
+                showToast(`Mint error: ${reason}`);
+            }
+        });
+
+        // Deposit Handler
+        document.getElementById('depositTokenBtn').addEventListener('click', async () => {
+            const piggyId = document.getElementById('depositPiggySelect').value;
+            const tokenAddr = document.getElementById('tokenAddressInput').value.trim();
+            const naturalAmount = document.getElementById('tokenAmountInput').value.trim();
+
+            if (!piggyId || !tokenAddr || !naturalAmount) return showToast("Fill all token deposit fields");
+
+            try {
+                const parsedUnits = ethers.parseUnits(naturalAmount, activeTokenDecimals);
+                const tokenContract = new ethers.Contract(tokenAddr, ERC20_ABI, signer);
+
+                showToast(`Checking ${activeTokenSymbol || 'ERC20'} allowance...`);
+                const allowance = await tokenContract.allowance(userAddress, CONTRACT_ADDRESS);
+
+                if (allowance < parsedUnits) {
+                    showToast(`Approving ${naturalAmount} ${activeTokenSymbol || 'tokens'}...`);
+                    const appTx = await tokenContract.approve(CONTRACT_ADDRESS, parsedUnits);
+                    await appTx.wait();
+                }
+
+                showToast(`Depositing into piggy.#${piggyId}...`);
+                const tx = await piggyContract.depositERC20(piggyId, tokenAddr, parsedUnits);
+                await tx.wait();
+
+                trackedErc20Tokens.add(tokenAddr.toLowerCase());
+                showToast("ERC20 Deposited!");
+
+                // Reload user balance and drawer balances
+                document.getElementById('tokenAmountInput').value = "";
+                await refreshAllBalancesAndViews();
+            } catch (err) {
+                showToast(`Deposit error: ${err.reason || err.message}`);
+            }
+        });
+
+        // Nest NFT Handler
+        document.getElementById('nestNftBtn').addEventListener('click', async () => {
+            const parentId = document.getElementById('nestPiggySelect').value;
+            const childAddr = document.getElementById('childNftAddressInput').value.trim();
+            const childTokenId = document.getElementById('childTokenIdInput').value.trim();
+
+            if (!parentId || !childAddr || !childTokenId) return showToast("Fill all NFT fields");
+
+            try {
+                const nftContract = new ethers.Contract(childAddr, ERC721_ABI, signer);
+                showToast("Checking NFT approval...");
+                const approved = await nftContract.getApproved(childTokenId);
+
+                if (approved.toLowerCase() !== CONTRACT_ADDRESS.toLowerCase()) {
+                    showToast("Approving NFT transfer...");
+                    const appTx = await nftContract.approve(CONTRACT_ADDRESS, childTokenId);
+                    await appTx.wait();
+                }
+
+                showToast(`Nesting NFT #${childTokenId} into piggy.#${parentId}...`);
+                const tx = await piggyContract.nestNFT(parentId, childAddr, childTokenId);
+                await tx.wait();
+                showToast("NFT Nested!");
+
+                // Reload drawer view and balances
+                document.getElementById('childTokenIdInput').value = "";
+                await refreshAllBalancesAndViews();
+            } catch (err) {
+                showToast(`Nest error: ${err.reason || err.message}`);
+            }
+        });
+
+        // Smash Handler
+        document.getElementById('smashActiveBtn').addEventListener('click', async () => {
+            if (!selectedPiggyId) return showToast("Select a piggy first");
+            try {
+                showToast(`Smashing piggy.#${selectedPiggyId}...`);
+                const tx = await piggyContract.smashPiggy(selectedPiggyId, Array.from(trackedErc20Tokens));
+                await tx.wait();
+                showToast(`piggy.#${selectedPiggyId} smashed! Assets & Slop Pot ETH released.`);
+                document.getElementById('piggyAccordion').classList.remove('open');
+                selectedPiggyId = null;
+                await scanUserPiggies();
+                await refreshAllBalancesAndViews();
+            } catch (err) {
+                showToast(`Smash error: ${err.reason || err.message}`);
+            }
+        });
+    </script>
+</body>
+
+</html>
