@@ -222,7 +222,7 @@
             background: var(--pink-subtle);
         }
 
-        /* Hero Vault - Borderless & Seamless */
+        /* Hero Vault */
         .hero-vault {
             background: transparent;
             padding: clamp(1rem, 4vw, 2.5rem) 0;
@@ -323,7 +323,7 @@
             color: var(--pink-primary);
         }
 
-        /* Quantity Selector Component */
+        /* Quantity Selector */
         .mint-controls-container {
             display: flex;
             flex-direction: column;
@@ -387,7 +387,7 @@
             color: var(--text-muted);
         }
 
-        /* Slop Pot Metre Positioned Below Mint CTA */
+        /* Slop Pot Metre */
         .slop-pot-wrapper {
             width: 100%;
             max-width: 480px;
@@ -459,7 +459,7 @@
             align-items: center;
         }
 
-        /* Side-Scrolling Piggy Gallery UI */
+        /* Gallery UI */
         .gallery-wrapper {
             position: relative;
             width: 100%;
@@ -570,7 +570,7 @@
             border-radius: 12px;
         }
 
-        /* Expanded Inspection Drawer */
+        /* Inspection Drawer */
         .drawer-panel {
             background: var(--surface-1);
             border-radius: 20px;
@@ -990,7 +990,7 @@
                 <button class="gallery-nav-btn next" id="slideRightBtn">&rsaquo;</button>
             </div>
 
-            <!-- Inspection, Smash & Export Panel (Popout View) -->
+            <!-- Inspection, Smash & Export Panel -->
             <div class="drawer-panel" id="piggyAccordion">
                 <div class="drawer-content-grid">
                     <!-- Left Column: Onchain SVG Render -->
@@ -1016,7 +1016,6 @@
                             </div>
 
                             <div class="drawer-actions">
-                                <!-- Save Piggy Options -->
                                 <div style="display: flex; gap: 0.35rem; align-items: center;">
                                     <button class="btn btn-export" onclick="exportPiggyImage('png')">💾 .PNG</button>
                                     <button class="btn btn-export" onclick="exportPiggyImage('svg')">💾 .SVG</button>
@@ -1035,7 +1034,6 @@
                                     <span>🖼️ Nested NFTs</span>
                                 </div>
                                 <div class="asset-grid" id="stashNftsGrid">
-                                    <!-- Dynamically Loaded NFT Items -->
                                 </div>
                             </div>
 
@@ -1045,7 +1043,6 @@
                                     <span>🪙 Nested ERC-20 Tokens</span>
                                 </div>
                                 <div class="asset-grid" id="stashErc20sGrid">
-                                    <!-- Dynamically Loaded ERC20 Items -->
                                 </div>
                             </div>
                         </div>
@@ -1163,11 +1160,13 @@
         const SEPOLIA_CHAIN_ID = "0xaa36a7";
         const CONTRACT_ADDRESS = "0x14dB58832E9A3F534a8c43f39D4E5a1514f4B906";
 
-        // Hardcoded Sepolia Token Addresses for presets
+        // Dedicated Public Sepolia RPC to bypass wallet RPC failure
+        const FALLBACK_RPC_URL = "https://ethereum-sepolia-rpc.publicnode.com";
+
         const HARDCODED_TOKENS = {
-            ETH: "0xfff9976782d46cc05630d1f6ebab18b2324d6b14", // Native ETH maps to Sepolia WETH for ERC20 vault operations
-            USDC: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238", // Sepolia USDC
-            WETH: "0xfff9976782d46cc05630d1f6ebab18b2324d6b14"  // Sepolia WETH
+            ETH: "0xfff9976782d46cc05630d1f6ebab18b2324d6b14",
+            USDC: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+            WETH: "0xfff9976782d46cc05630d1f6ebab18b2324d6b14"
         };
 
         const PIGGY_ABI = [
@@ -1208,7 +1207,8 @@
             "function uri(uint256 tokenId) external view returns (string)"
         ];
 
-        let provider, signer, piggyContract;
+        // Global State Objects
+        let provider, readProvider, signer, piggyContract, readPiggyContract;
         let activeRawProvider = null;
         let userAddress = null;
         let ownedPiggies = [];
@@ -1226,10 +1226,17 @@
         let activeTokenDecimals = 18;
         let activeTokenSymbol = "";
 
-        // Mint Stepper State
         let selectedMintQty = 1;
         let userMintedCount = 0;
         const MAX_PER_WALLET_CAP = 10;
+
+        // Initialize dedicated fallback read provider
+        try {
+            readProvider = new ethers.JsonRpcProvider(FALLBACK_RPC_URL);
+            readPiggyContract = new ethers.Contract(CONTRACT_ADDRESS, PIGGY_ABI, readProvider);
+        } catch (e) {
+            console.warn("Could not instantiate JsonRpcProvider fallback", e);
+        }
 
         const themeToggleBtn = document.getElementById('themeToggleBtn');
         const walletModal = document.getElementById('walletModal');
@@ -1238,13 +1245,11 @@
         const connectWalletBtn = document.getElementById('connectWalletBtn');
         const piggyClicker = document.getElementById('piggyClicker');
 
-        // Quantity controls
         const qtyDecBtn = document.getElementById('qtyDecBtn');
         const qtyIncBtn = document.getElementById('qtyIncBtn');
         const qtyDisplay = document.getElementById('qtyDisplay');
         const heroMintBtn = document.getElementById('heroMintBtn');
 
-        // Gallery nav controls
         document.getElementById('slideLeftBtn').addEventListener('click', () => {
             document.getElementById('piggySlider').scrollBy({ left: -220, behavior: 'smooth' });
         });
@@ -1269,26 +1274,8 @@
             try {
                 const audio = new Audio(REAL_PIG_OINK_BASE64);
                 audio.volume = 0.85;
-                audio.play().catch(() => {
-                    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                    const osc = audioCtx.createOscillator();
-                    const gain = audioCtx.createGain();
-                    osc.type = 'sawtooth';
-                    const now = audioCtx.currentTime;
-                    osc.frequency.setValueAtTime(340, now);
-                    osc.frequency.exponentialRampToValueAtTime(130, now + 0.14);
-                    osc.frequency.linearRampToValueAtTime(210, now + 0.24);
-                    osc.frequency.exponentialRampToValueAtTime(65, now + 0.38);
-                    gain.gain.setValueAtTime(0.28, now);
-                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.38);
-                    osc.connect(gain);
-                    gain.connect(audioCtx.destination);
-                    osc.start(now);
-                    osc.stop(now + 0.38);
-                });
-            } catch (e) {
-                console.warn("Audio unavailable", e);
-            }
+                audio.play().catch(() => {});
+            } catch (e) {}
         }
 
         piggyClicker.addEventListener('click', () => {
@@ -1340,7 +1327,6 @@
             }
         });
 
-        // Set Hardcoded Token Address Presets
         function setTokenPreset(symbol) {
             const tokenInput = document.getElementById('tokenAddressInput');
             if (symbol === 'ETH') {
@@ -1352,7 +1338,6 @@
             }
         }
 
-        // Toggle Connect / Disconnect Wallet Button Functionality
         connectWalletBtn.addEventListener('click', () => {
             if (userAddress) {
                 disconnectWallet();
@@ -1386,7 +1371,6 @@
 
         document.getElementById('closeModal').addEventListener('click', () => { walletModal.style.display = "none"; });
 
-        // Multi-Wallet Resolver (MetaMask / Coinbase / Rabby / Generic Injected)
         function getWalletProvider(providerType) {
             if (!window.ethereum && !window.coinbaseWalletExtension && !window.rabby) return null;
 
@@ -1419,7 +1403,6 @@
             return window.ethereum;
         }
 
-        // Force wallet connection & switch to Sepolia testnet across ALL wallet types
         async function forceSepoliaNetwork(targetProvider) {
             const activeProv = targetProvider || activeRawProvider || window.ethereum;
             if (!activeProv) throw new Error("No active wallet provider found.");
@@ -1430,7 +1413,6 @@
                     params: [{ chainId: SEPOLIA_CHAIN_ID }],
                 });
             } catch (switchError) {
-                // Code 4902 or -32603 indicates chain has not been added to wallet
                 if (switchError.code === 4902 || switchError.code === -32603 || switchError?.data?.originalError?.code === 4902) {
                     await activeProv.request({
                         method: 'wallet_addEthereumChain',
@@ -1446,33 +1428,19 @@
                     throw switchError;
                 }
             }
-
-            // Verify chain ID post switch
-            const currentChain = await activeProv.request({ method: 'eth_chainId' });
-            if (currentChain.toLowerCase() !== SEPOLIA_CHAIN_ID.toLowerCase()) {
-                throw new Error("Wallet switch rejected: network must be Sepolia.");
-            }
         }
 
         async function connectWallet(providerType = 'injected', isAutoConnect = false) {
             walletModal.style.display = "none";
 
-            if (typeof window.ethers === "undefined") {
-                return showToast("Ethers.js library failed to load. Check CDN connection.");
-            }
-
             const rawProv = getWalletProvider(providerType);
-
             if (!rawProv) {
                 if (!isAutoConnect) showToast(`Requested wallet (${providerType}) is not installed or available.`);
                 return;
             }
 
             try {
-                // Request account access first
                 await rawProv.request({ method: 'eth_requestAccounts' });
-
-                // Force network switch to Sepolia unconditionally on all wallets
                 await forceSepoliaNetwork(rawProv);
 
                 activeRawProvider = rawProv;
@@ -1488,78 +1456,56 @@
                 connectWalletBtn.innerText = `${userAddress.substring(0, 6)}...${userAddress.substring(38)}`;
                 showToast(`Connected on Sepolia: ${userAddress.substring(0, 6)}`);
 
-                // Event Listeners for account or chain switching
                 if (rawProv.on) {
-                    rawProv.on('accountsChanged', (accounts) => {
-                        if (accounts.length === 0) {
-                            disconnectWallet();
-                        } else {
-                            connectWallet(providerType, true);
-                        }
-                    });
-
-                    rawProv.on('chainChanged', async (chainIdHex) => {
-                        if (chainIdHex.toLowerCase() !== SEPOLIA_CHAIN_ID.toLowerCase()) {
-                            showToast("Wrong network detected. Forcing Sepolia switch...");
-                            try {
-                                await forceSepoliaNetwork(rawProv);
-                                window.location.reload();
-                            } catch (e) {
-                                showToast("Network switch refused. Disconnecting wallet...");
-                                disconnectWallet();
-                            }
-                        } else {
-                            window.location.reload();
-                        }
-                    });
+                    rawProv.on('accountsChanged', () => connectWallet(providerType, true));
+                    rawProv.on('chainChanged', () => window.location.reload());
                 }
 
                 await fetchUserEthBalance();
                 await refreshProtocolStats();
                 await scanUserPiggies();
             } catch (err) {
-                console.error("Wallet connection sequence error:", err);
+                console.error("Wallet connection error:", err);
                 if (!isAutoConnect) {
-                    const msg = err.reason || err.shortMessage || err.message || "Failed to switch/connect to Sepolia";
-                    showToast(`Connection error: ${msg}`);
+                    showToast(`Connection error: ${err.shortMessage || err.message}`);
                 }
                 disconnectWallet();
             }
         }
 
-        // Verify active network before initiating any onchain action
         async function ensureSepoliaBeforeTx() {
             if (!activeRawProvider) throw new Error("Wallet provider not connected.");
             await forceSepoliaNetwork(activeRawProvider);
         }
 
-        // Auto-connect on page reload if previously connected
         window.addEventListener('DOMContentLoaded', () => {
             const isConnected = localStorage.getItem('piggy_wallet_connected');
             const walletType = localStorage.getItem('piggy_wallet_type') || 'injected';
+            
+            // Immediate public read load
+            refreshProtocolStats();
+
             if (isConnected === 'true') {
                 connectWallet(walletType, true);
             }
         });
 
         async function fetchUserEthBalance() {
-            if (!provider || !userAddress) return;
+            if (!userAddress) return;
             try {
-                const bal = await provider.getBalance(userAddress);
+                const activeP = readProvider || provider;
+                const bal = await activeP.getBalance(userAddress);
                 const ethStr = parseFloat(ethers.formatEther(bal)).toFixed(4);
                 document.getElementById('ethVal').innerText = `${ethStr} ETH`;
-            } catch (e) {
-                console.warn("Could not fetch user ETH balance", e);
-            }
+            } catch (e) {}
         }
 
-        // Refresh token balances for the deposit field UI
         async function updateTokenBalanceHint() {
             const addr = document.getElementById('tokenAddressInput').value.trim();
             const detectHint = document.getElementById('tokenDetectHint');
             const balHint = document.getElementById('tokenBalanceHint');
 
-            if (!ethers.isAddress(addr) || !provider) {
+            if (!ethers.isAddress(addr)) {
                 detectHint.innerText = "";
                 balHint.innerText = "";
                 activeTokenDecimals = 18;
@@ -1568,7 +1514,8 @@
 
             try {
                 detectHint.innerText = "Scanning...";
-                const erc20 = new ethers.Contract(addr, ERC20_ABI, provider);
+                const activeP = readProvider || provider;
+                const erc20 = new ethers.Contract(addr, ERC20_ABI, activeP);
                 const [sym, dec, bal] = await Promise.all([
                     erc20.symbol().catch(() => "TOK"),
                     erc20.decimals().catch(() => 18),
@@ -1588,7 +1535,6 @@
             }
         }
 
-        // Scan and display child NFT collection name & symbol
         async function updateChildNftHint() {
             const addr = document.getElementById('childNftAddressInput').value.trim();
             const detailsHint = document.getElementById('childNftDetailsHint');
@@ -1600,7 +1546,7 @@
 
             try {
                 detailsHint.innerText = "Scanning NFT Collection...";
-                const activeProv = provider || new ethers.JsonRpcProvider("https://rpc.sepolia.org");
+                const activeProv = readProvider || provider;
                 const nftContract = new ethers.Contract(addr, ERC721_ABI, activeProv);
 
                 const [name, symbol] = await Promise.all([
@@ -1618,31 +1564,33 @@
             }
         }
 
-        // Event listeners for inputs
         document.getElementById('tokenAddressInput').addEventListener('input', updateTokenBalanceHint);
         document.getElementById('childNftAddressInput').addEventListener('input', updateChildNftHint);
 
         async function refreshProtocolStats() {
-            if (!piggyContract || !provider) return;
+            const c = readPiggyContract || piggyContract;
+            if (!c) return;
+
             try {
-                globalTotalSupply = await piggyContract.totalSupply();
+                globalTotalSupply = await c.totalSupply();
                 document.getElementById('statMintedTotal').innerText = `${globalTotalSupply.toString()} / 10,000`;
 
                 try {
-                    globalActiveSupply = await piggyContract.activeSupply();
+                    globalActiveSupply = await c.activeSupply();
                 } catch (e) {
                     globalActiveSupply = globalTotalSupply;
                 }
 
                 try {
-                    singleMintPriceWei = await piggyContract.MINT_PRICE();
+                    singleMintPriceWei = await c.MINT_PRICE();
                     const priceFormatted = ethers.formatEther(singleMintPriceWei);
                     document.getElementById('statMintPrice').innerText = `${priceFormatted} ETH`;
                 } catch (e) {
                     singleMintPriceWei = ethers.parseEther("0.0005");
                 }
 
-                globalVaultEthBalance = await provider.getBalance(CONTRACT_ADDRESS);
+                const activeP = readProvider || provider;
+                globalVaultEthBalance = await activeP.getBalance(CONTRACT_ADDRESS);
                 const ethFormatted = ethers.formatEther(globalVaultEthBalance);
                 document.getElementById('slopPotEth').innerText = `${parseFloat(ethFormatted).toFixed(4)} ETH`;
 
@@ -1652,21 +1600,22 @@
                 document.getElementById('slopPotFill').style.width = `${Math.max(percentage, 2)}%`;
 
                 if (userAddress) {
-                    const mintedBN = await piggyContract.mintedPerWallet(userAddress);
+                    const mintedBN = await c.mintedPerWallet(userAddress);
                     userMintedCount = Number(mintedBN);
                     document.getElementById('statWalletAllowance').innerText = `${userMintedCount} / 10`;
                 }
 
                 updateQtyUI();
             } catch (e) {
-                console.warn("Contract query pending initialization.", e);
+                console.warn("Error refreshing protocol stats:", e);
             }
         }
 
         async function fetchOnchainPiggyMetadata(tokenId) {
             if (piggyDataCache[tokenId]) return piggyDataCache[tokenId];
             try {
-                const tokenUri = await piggyContract.tokenURI(tokenId);
+                const c = readPiggyContract || piggyContract;
+                const tokenUri = await c.tokenURI(tokenId);
                 const base64Json = tokenUri.replace("data:application/json;base64,", "");
                 const jsonStr = atob(base64Json);
                 const metadata = JSON.parse(jsonStr);
@@ -1682,7 +1631,6 @@
                 };
                 return piggyDataCache[tokenId];
             } catch (err) {
-                console.warn(`Failed to parse onchain SVG for Piggy #${tokenId}`, err);
                 return null;
             }
         }
@@ -1692,7 +1640,8 @@
             if (nftImageCache[key]) return nftImageCache[key];
 
             try {
-                const nftContract = new ethers.Contract(contractAddress, ERC721_ABI, provider);
+                const activeP = readProvider || provider;
+                const nftContract = new ethers.Contract(contractAddress, ERC721_ABI, activeP);
                 let uri = "";
                 try {
                     uri = await nftContract.tokenURI(tokenId);
@@ -1727,32 +1676,30 @@
                     nftImageCache[key] = imageUrl;
                     return imageUrl;
                 }
-            } catch (err) {
-                console.warn(`Could not resolve image for NFT ${contractAddress} #${tokenId}`, err);
-            }
+            } catch (err) {}
             return null;
         }
 
         async function scanUserPiggies() {
-            if (!piggyContract || !userAddress) return;
+            if (!userAddress) return;
             showToast("Scanning owned piggies onchain...");
 
             ownedPiggies = [];
             const slider = document.getElementById('piggySlider');
             slider.innerHTML = "";
 
+            const c = readPiggyContract || piggyContract;
+
             try {
                 for (let id = 1; id <= Number(globalTotalSupply); id++) {
                     try {
-                        const owner = await piggyContract.ownerOf(id);
+                        const owner = await c.ownerOf(id);
                         if (owner.toLowerCase() === userAddress.toLowerCase()) {
                             ownedPiggies.push(id);
                         }
-                    } catch (e) { }
+                    } catch (e) {}
                 }
-            } catch (e) {
-                console.warn(e);
-            }
+            } catch (e) {}
 
             document.getElementById('piggyCount').innerText = ownedPiggies.length;
             updateSelectDropdowns();
@@ -1816,11 +1763,13 @@
             document.getElementById('activePiggyId').innerText = id;
             document.getElementById('smashBtnId').innerText = id;
 
+            const c = readPiggyContract || piggyContract;
+
             try {
-                if (piggyContract) {
-                    globalActiveSupply = await piggyContract.activeSupply();
+                if (c) {
+                    globalActiveSupply = await c.activeSupply();
                 }
-            } catch (e) { }
+            } catch (e) {}
 
             if (globalActiveSupply > 0n && globalVaultEthBalance > 0n) {
                 const estBounty = globalVaultEthBalance / globalActiveSupply;
@@ -1832,11 +1781,11 @@
             const drawer = document.getElementById('piggyAccordion');
             drawer.classList.add('open');
 
-            document.querySelectorAll('.vault-card').forEach((c, idx) => {
+            document.querySelectorAll('.vault-card').forEach((cardEl, idx) => {
                 if (ownedPiggies[idx] === id) {
-                    c.classList.add('active');
+                    cardEl.classList.add('active');
                 } else {
-                    c.classList.remove('active');
+                    cardEl.classList.remove('active');
                 }
             });
 
@@ -1856,32 +1805,32 @@
             nftsGrid.innerHTML = `<div style="color: var(--text-muted); font-family: 'JetBrains Mono', monospace; grid-column: 1/-1;">Loading nested NFTs...</div>`;
             erc20sGrid.innerHTML = `<div style="color: var(--text-muted); font-family: 'JetBrains Mono', monospace; grid-column: 1/-1;">Loading nested ERC-20s...</div>`;
 
-            // Load Segment 1: Nested Child NFTs
+            // Nested Child NFTs
             try {
-                const children = await piggyContract.childrenOf(id);
+                const children = await c.childrenOf(id);
                 nftsGrid.innerHTML = "";
 
                 if (children.length === 0) {
                     nftsGrid.innerHTML = `<div style="color: var(--text-muted); grid-column: 1/-1; font-family: 'JetBrains Mono', monospace;">No nested NFTs in piggy.#${id}.</div>`;
                 } else {
-                    children.forEach((c) => {
-                        const nftCardId = `child-nft-${c.contractAddress.substring(2, 6)}-${c.tokenId}`;
+                    children.forEach((childItem) => {
+                        const nftCardId = `child-nft-${childItem.contractAddress.substring(2, 6)}-${childItem.tokenId}`;
                         nftsGrid.innerHTML += `
                             <div class="asset-item">
                                 <div class="asset-item-img" id="${nftCardId}">
                                     <span>🖼️</span>
                                 </div>
                                 <div>
-                                    <div style="font-weight: 700;">NFT #${c.tokenId.toString()}</div>
-                                    <div style="font-size: 0.7rem; color: var(--text-muted);">${c.contractAddress.substring(0, 8)}...</div>
+                                    <div style="font-weight: 700;">NFT #${childItem.tokenId.toString()}</div>
+                                    <div style="font-size: 0.7rem; color: var(--text-muted);">${childItem.contractAddress.substring(0, 8)}...</div>
                                 </div>
                             </div>
                         `;
 
-                        fetchChildNftImage(c.contractAddress, c.tokenId).then(imgUri => {
+                        fetchChildNftImage(childItem.contractAddress, childItem.tokenId).then(imgUri => {
                             const imgBox = document.getElementById(nftCardId);
                             if (imgBox && imgUri) {
-                                imgBox.innerHTML = `<img src="${imgUri}" alt="NFT #${c.tokenId}" />`;
+                                imgBox.innerHTML = `<img src="${imgUri}" alt="NFT #${childItem.tokenId}" />`;
                             }
                         });
                     });
@@ -1890,27 +1839,29 @@
                 nftsGrid.innerHTML = `<div style="color: var(--danger); font-family: 'JetBrains Mono', monospace; grid-column: 1/-1;">Failed to load nested NFTs.</div>`;
             }
 
-            // Load Segment 2: Nested ERC-20 Tokens
+            // Nested ERC-20 Tokens
             try {
                 erc20sGrid.innerHTML = "";
                 let foundErc20 = false;
+
+                const activeP = readProvider || provider;
 
                 for (let tokenAddr of trackedErc20Tokens) {
                     try {
                         let tokenBal = 0n;
                         try {
-                            tokenBal = await piggyContract.erc20Balances(id, tokenAddr);
+                            tokenBal = await c.erc20Balances(id, tokenAddr);
                         } catch (e1) {
                             try {
-                                tokenBal = await piggyContract.piggyERC20Balance(id, tokenAddr);
+                                tokenBal = await c.piggyERC20Balance(id, tokenAddr);
                             } catch (e2) {
-                                tokenBal = await piggyContract.tokenBalance(id, tokenAddr);
+                                tokenBal = await c.tokenBalance(id, tokenAddr);
                             }
                         }
 
                         if (tokenBal > 0n) {
                             foundErc20 = true;
-                            const erc20 = new ethers.Contract(tokenAddr, ERC20_ABI, provider);
+                            const erc20 = new ethers.Contract(tokenAddr, ERC20_ABI, activeP);
                             const [symbol, dec] = await Promise.all([
                                 erc20.symbol().catch(() => "TOKEN"),
                                 erc20.decimals().catch(() => 18)
@@ -1928,9 +1879,7 @@
                                 </div>
                             `;
                         }
-                    } catch (e) {
-                        console.warn(`Error reading ERC20 balance for token ${tokenAddr}`, e);
-                    }
+                    } catch (e) {}
                 }
 
                 if (!foundErc20) {
@@ -1943,7 +1892,6 @@
             drawer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
 
-        // Complete Auto-Refresh Handler across UI components
         async function refreshAllBalancesAndViews() {
             await fetchUserEthBalance();
             await refreshProtocolStats();
@@ -2000,6 +1948,7 @@
             img.src = url;
         }
 
+        // BATCH MINT WITH EXPLICIT GAS LIMIT OVERRIDE
         heroMintBtn.addEventListener('click', async () => {
             if (!piggyContract || !signer) return showToast("Connect wallet first!");
 
@@ -2008,20 +1957,21 @@
                 playPigSound();
 
                 let price = singleMintPriceWei;
+                const c = readPiggyContract || piggyContract;
                 try {
-                    price = await piggyContract.MINT_PRICE();
+                    price = await c.MINT_PRICE();
                     singleMintPriceWei = price;
-                } catch (e) {
-                    console.warn("Using cached MINT_PRICE", e);
-                }
+                } catch (e) {}
 
                 const qty = selectedMintQty;
                 const totalValue = BigInt(price.toString()) * BigInt(qty);
 
                 showToast(`Initiating batch mint for ${qty} piggy unit(s)...`);
 
+                // Explicit gasLimit bypasses RPC estimateGas coalesce failure
                 const tx = await piggyContract.mintPiggyBatch(userAddress, qty, {
-                    value: totalValue
+                    value: totalValue,
+                    gasLimit: 350000n * BigInt(qty)
                 });
 
                 showToast(`Awaiting block confirmation...`);
@@ -2038,12 +1988,12 @@
                     return;
                 }
 
-                const reason = err.reason || err.shortMessage || err.message;
+                const reason = err.reason || err.shortMessage || err.message || "Execution error";
                 showToast(`Mint error: ${reason}`);
             }
         });
 
-        // Deposit Handler
+        // DEPOSIT TOKENS WITH EXPLICIT GAS LIMIT
         document.getElementById('depositTokenBtn').addEventListener('click', async () => {
             const piggyId = document.getElementById('depositPiggySelect').value;
             const tokenAddr = document.getElementById('tokenAddressInput').value.trim();
@@ -2061,18 +2011,21 @@
 
                 if (allowance < parsedUnits) {
                     showToast(`Approving ${naturalAmount} ${activeTokenSymbol || 'tokens'}...`);
-                    const appTx = await tokenContract.approve(CONTRACT_ADDRESS, parsedUnits);
+                    const appTx = await tokenContract.approve(CONTRACT_ADDRESS, parsedUnits, {
+                        gasLimit: 100000n
+                    });
                     await appTx.wait();
                 }
 
                 showToast(`Depositing into piggy.#${piggyId}...`);
-                const tx = await piggyContract.depositERC20(piggyId, tokenAddr, parsedUnits);
+                const tx = await piggyContract.depositERC20(piggyId, tokenAddr, parsedUnits, {
+                    gasLimit: 250000n
+                });
                 await tx.wait();
 
                 trackedErc20Tokens.add(tokenAddr.toLowerCase());
                 showToast("ERC20 Deposited!");
 
-                // Reload user balance and drawer balances
                 document.getElementById('tokenAmountInput').value = "";
                 await refreshAllBalancesAndViews();
             } catch (err) {
@@ -2080,7 +2033,7 @@
             }
         });
 
-        // Nest NFT Handler
+        // NEST NFT WITH EXPLICIT GAS LIMIT
         document.getElementById('nestNftBtn').addEventListener('click', async () => {
             const parentId = document.getElementById('nestPiggySelect').value;
             const childAddr = document.getElementById('childNftAddressInput').value.trim();
@@ -2096,16 +2049,19 @@
 
                 if (approved.toLowerCase() !== CONTRACT_ADDRESS.toLowerCase()) {
                     showToast("Approving NFT transfer...");
-                    const appTx = await nftContract.approve(CONTRACT_ADDRESS, childTokenId);
+                    const appTx = await nftContract.approve(CONTRACT_ADDRESS, childTokenId, {
+                        gasLimit: 100000n
+                    });
                     await appTx.wait();
                 }
 
                 showToast(`Nesting NFT #${childTokenId} into piggy.#${parentId}...`);
-                const tx = await piggyContract.nestNFT(parentId, childAddr, childTokenId);
+                const tx = await piggyContract.nestNFT(parentId, childAddr, childTokenId, {
+                    gasLimit: 250000n
+                });
                 await tx.wait();
                 showToast("NFT Nested!");
 
-                // Reload drawer view and balances
                 document.getElementById('childTokenIdInput').value = "";
                 await refreshAllBalancesAndViews();
             } catch (err) {
@@ -2113,13 +2069,15 @@
             }
         });
 
-        // Smash Handler
+        // SMASH WITH EXPLICIT GAS LIMIT
         document.getElementById('smashActiveBtn').addEventListener('click', async () => {
             if (!selectedPiggyId) return showToast("Select a piggy first");
             try {
                 await ensureSepoliaBeforeTx();
                 showToast(`Smashing piggy.#${selectedPiggyId}...`);
-                const tx = await piggyContract.smashPiggy(selectedPiggyId, Array.from(trackedErc20Tokens));
+                const tx = await piggyContract.smashPiggy(selectedPiggyId, Array.from(trackedErc20Tokens), {
+                    gasLimit: 400000n
+                });
                 await tx.wait();
                 showToast(`piggy.#${selectedPiggyId} smashed! Assets & Slop Pot ETH released.`);
                 document.getElementById('piggyAccordion').classList.remove('open');
