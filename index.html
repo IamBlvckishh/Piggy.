@@ -1208,7 +1208,8 @@
         ];
 
         // Global State Objects
-        let provider, readProvider, signer, piggyContract, readPiggyContract;
+        let provider, readProvider, signer, readPiggyContract;
+        let piggyIface = new ethers.Interface(PIGGY_ABI);
         let activeRawProvider = null;
         let userAddress = null;
         let ownedPiggies = [];
@@ -1448,8 +1449,6 @@
                 signer = await provider.getSigner();
                 userAddress = await signer.getAddress();
 
-                piggyContract = new ethers.Contract(CONTRACT_ADDRESS, PIGGY_ABI, signer);
-
                 localStorage.setItem('piggy_wallet_connected', 'true');
                 localStorage.setItem('piggy_wallet_type', providerType);
 
@@ -1568,7 +1567,7 @@
         document.getElementById('childNftAddressInput').addEventListener('input', updateChildNftHint);
 
         async function refreshProtocolStats() {
-            const c = readPiggyContract || piggyContract;
+            const c = readPiggyContract;
             if (!c) return;
 
             try {
@@ -1614,7 +1613,7 @@
         async function fetchOnchainPiggyMetadata(tokenId) {
             if (piggyDataCache[tokenId]) return piggyDataCache[tokenId];
             try {
-                const c = readPiggyContract || piggyContract;
+                const c = readPiggyContract;
                 const tokenUri = await c.tokenURI(tokenId);
                 const base64Json = tokenUri.replace("data:application/json;base64,", "");
                 const jsonStr = atob(base64Json);
@@ -1688,7 +1687,7 @@
             const slider = document.getElementById('piggySlider');
             slider.innerHTML = "";
 
-            const c = readPiggyContract || piggyContract;
+            const c = readPiggyContract;
 
             try {
                 for (let id = 1; id <= Number(globalTotalSupply); id++) {
@@ -1763,7 +1762,7 @@
             document.getElementById('activePiggyId').innerText = id;
             document.getElementById('smashBtnId').innerText = id;
 
-            const c = readPiggyContract || piggyContract;
+            const c = readPiggyContract;
 
             try {
                 if (c) {
@@ -1948,34 +1947,47 @@
             img.src = url;
         }
 
-        // BATCH MINT WITH EXPLICIT GAS LIMIT OVERRIDE
+        // BATCH MINT VIA RAW SIGNER DISPATCH (BYPASSES ETHERS COALESCE BUG)
         heroMintBtn.addEventListener('click', async () => {
-            if (!piggyContract || !signer) return showToast("Connect wallet first!");
+            if (!signer || !userAddress) return showToast("Connect wallet first!");
 
             try {
                 await ensureSepoliaBeforeTx();
                 playPigSound();
 
                 let price = singleMintPriceWei;
-                const c = readPiggyContract || piggyContract;
                 try {
-                    price = await c.MINT_PRICE();
+                    price = await readPiggyContract.MINT_PRICE();
                     singleMintPriceWei = price;
                 } catch (e) {}
 
                 const qty = selectedMintQty;
-                const totalValue = BigInt(price.toString()) * BigInt(qty);
+                const totalValue = price * BigInt(qty);
 
                 showToast(`Initiating batch mint for ${qty} piggy unit(s)...`);
 
-                // Explicit gasLimit bypasses RPC estimateGas coalesce failure
-                const tx = await piggyContract.mintPiggyBatch(userAddress, qty, {
+                let txData;
+                // Try encoding with signature priority to avoid ambiguous overloaded resolution
+                try {
+                    txData = piggyIface.encodeFunctionData("mintPiggyBatch", [userAddress, qty]);
+                } catch (e1) {
+                    try {
+                        txData = piggyIface.encodeFunctionData("mintPiggy(address,uint256)", [userAddress, qty]);
+                    } catch (e2) {
+                        txData = piggyIface.encodeFunctionData("mintPiggy(address)", [userAddress]);
+                    }
+                }
+
+                // Direct transaction dispatch prevents Ethers contract caller coalesce crash
+                const txResponse = await signer.sendTransaction({
+                    to: CONTRACT_ADDRESS,
+                    data: txData,
                     value: totalValue,
                     gasLimit: 350000n * BigInt(qty)
                 });
 
-                showToast(`Awaiting block confirmation...`);
-                await tx.wait();
+                showToast(`Transaction sent! Awaiting block confirmation...`);
+                await txResponse.wait();
 
                 showToast(`Successfully minted ${qty} piggy container(s)! 🐷`);
                 await scanUserPiggies();
@@ -1993,7 +2005,7 @@
             }
         });
 
-        // DEPOSIT TOKENS WITH EXPLICIT GAS LIMIT
+        // DEPOSIT TOKENS VIA RAW DISPATCH
         document.getElementById('depositTokenBtn').addEventListener('click', async () => {
             const piggyId = document.getElementById('depositPiggySelect').value;
             const tokenAddr = document.getElementById('tokenAddressInput').value.trim();
@@ -2004,24 +2016,33 @@
             try {
                 await ensureSepoliaBeforeTx();
                 const parsedUnits = ethers.parseUnits(naturalAmount, activeTokenDecimals);
-                const tokenContract = new ethers.Contract(tokenAddr, ERC20_ABI, signer);
+                const erc20Iface = new ethers.Interface(ERC20_ABI);
+                
+                const activeP = readProvider || provider;
+                const erc20 = new ethers.Contract(tokenAddr, ERC20_ABI, activeP);
 
                 showToast(`Checking ${activeTokenSymbol || 'ERC20'} allowance...`);
-                const allowance = await tokenContract.allowance(userAddress, CONTRACT_ADDRESS);
+                const allowance = await erc20.allowance(userAddress, CONTRACT_ADDRESS);
 
                 if (allowance < parsedUnits) {
                     showToast(`Approving ${naturalAmount} ${activeTokenSymbol || 'tokens'}...`);
-                    const appTx = await tokenContract.approve(CONTRACT_ADDRESS, parsedUnits, {
+                    const appData = erc20Iface.encodeFunctionData("approve", [CONTRACT_ADDRESS, parsedUnits]);
+                    const appTx = await signer.sendTransaction({
+                        to: tokenAddr,
+                        data: appData,
                         gasLimit: 100000n
                     });
                     await appTx.wait();
                 }
 
                 showToast(`Depositing into piggy.#${piggyId}...`);
-                const tx = await piggyContract.depositERC20(piggyId, tokenAddr, parsedUnits, {
+                const depData = piggyIface.encodeFunctionData("depositERC20", [piggyId, tokenAddr, parsedUnits]);
+                const depTx = await signer.sendTransaction({
+                    to: CONTRACT_ADDRESS,
+                    data: depData,
                     gasLimit: 250000n
                 });
-                await tx.wait();
+                await depTx.wait();
 
                 trackedErc20Tokens.add(tokenAddr.toLowerCase());
                 showToast("ERC20 Deposited!");
@@ -2033,7 +2054,7 @@
             }
         });
 
-        // NEST NFT WITH EXPLICIT GAS LIMIT
+        // NEST NFT VIA RAW DISPATCH
         document.getElementById('nestNftBtn').addEventListener('click', async () => {
             const parentId = document.getElementById('nestPiggySelect').value;
             const childAddr = document.getElementById('childNftAddressInput').value.trim();
@@ -2043,23 +2064,32 @@
 
             try {
                 await ensureSepoliaBeforeTx();
-                const nftContract = new ethers.Contract(childAddr, ERC721_ABI, signer);
+                const nftIface = new ethers.Interface(ERC721_ABI);
+                const activeP = readProvider || provider;
+                const nftContract = new ethers.Contract(childAddr, ERC721_ABI, activeP);
+
                 showToast("Checking NFT approval...");
                 const approved = await nftContract.getApproved(childTokenId);
 
                 if (approved.toLowerCase() !== CONTRACT_ADDRESS.toLowerCase()) {
                     showToast("Approving NFT transfer...");
-                    const appTx = await nftContract.approve(CONTRACT_ADDRESS, childTokenId, {
+                    const appData = nftIface.encodeFunctionData("approve", [CONTRACT_ADDRESS, childTokenId]);
+                    const appTx = await signer.sendTransaction({
+                        to: childAddr,
+                        data: appData,
                         gasLimit: 100000n
                     });
                     await appTx.wait();
                 }
 
                 showToast(`Nesting NFT #${childTokenId} into piggy.#${parentId}...`);
-                const tx = await piggyContract.nestNFT(parentId, childAddr, childTokenId, {
+                const nestData = piggyIface.encodeFunctionData("nestNFT", [parentId, childAddr, childTokenId]);
+                const nestTx = await signer.sendTransaction({
+                    to: CONTRACT_ADDRESS,
+                    data: nestData,
                     gasLimit: 250000n
                 });
-                await tx.wait();
+                await nestTx.wait();
                 showToast("NFT Nested!");
 
                 document.getElementById('childTokenIdInput').value = "";
@@ -2069,16 +2099,21 @@
             }
         });
 
-        // SMASH WITH EXPLICIT GAS LIMIT
+        // SMASH VIA RAW DISPATCH
         document.getElementById('smashActiveBtn').addEventListener('click', async () => {
             if (!selectedPiggyId) return showToast("Select a piggy first");
             try {
                 await ensureSepoliaBeforeTx();
                 showToast(`Smashing piggy.#${selectedPiggyId}...`);
-                const tx = await piggyContract.smashPiggy(selectedPiggyId, Array.from(trackedErc20Tokens), {
+                
+                const smashData = piggyIface.encodeFunctionData("smashPiggy", [selectedPiggyId, Array.from(trackedErc20Tokens)]);
+                const smashTx = await signer.sendTransaction({
+                    to: CONTRACT_ADDRESS,
+                    data: smashData,
                     gasLimit: 400000n
                 });
-                await tx.wait();
+                await smashTx.wait();
+
                 showToast(`piggy.#${selectedPiggyId} smashed! Assets & Slop Pot ETH released.`);
                 document.getElementById('piggyAccordion').classList.remove('open');
                 selectedPiggyId = null;
