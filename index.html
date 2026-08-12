@@ -1209,6 +1209,7 @@
         ];
 
         let provider, signer, piggyContract;
+        let activeRawProvider = null;
         let userAddress = null;
         let ownedPiggies = [];
         let piggyDataCache = {};
@@ -1363,6 +1364,7 @@
         function disconnectWallet() {
             provider = null;
             signer = null;
+            activeRawProvider = null;
             userAddress = null;
             ownedPiggies = [];
             selectedPiggyId = null;
@@ -1384,16 +1386,53 @@
 
         document.getElementById('closeModal').addEventListener('click', () => { walletModal.style.display = "none"; });
 
-        async function forceSepoliaNetwork() {
-            if (!window.ethereum) return;
+        // Multi-Wallet Resolver (MetaMask / Coinbase / Rabby / Generic Injected)
+        function getWalletProvider(providerType) {
+            if (!window.ethereum && !window.coinbaseWalletExtension && !window.rabby) return null;
+
+            if (window.ethereum?.providers?.length) {
+                if (providerType === 'coinbase') {
+                    const cb = window.ethereum.providers.find(p => p.isCoinbaseWallet);
+                    if (cb) return cb;
+                }
+                if (providerType === 'rabby') {
+                    const rabby = window.ethereum.providers.find(p => p.isRabby);
+                    if (rabby) return rabby;
+                }
+                if (providerType === 'injected') {
+                    const mm = window.ethereum.providers.find(p => p.isMetaMask);
+                    if (mm) return mm;
+                    return window.ethereum.providers[0];
+                }
+            }
+
+            if (providerType === 'coinbase') {
+                if (window.coinbaseWalletExtension) return window.coinbaseWalletExtension;
+                if (window.ethereum?.isCoinbaseWallet) return window.ethereum;
+            }
+
+            if (providerType === 'rabby') {
+                if (window.rabby) return window.rabby;
+                if (window.ethereum?.isRabby) return window.ethereum;
+            }
+
+            return window.ethereum;
+        }
+
+        // Force wallet connection & switch to Sepolia testnet across ALL wallet types
+        async function forceSepoliaNetwork(targetProvider) {
+            const activeProv = targetProvider || activeRawProvider || window.ethereum;
+            if (!activeProv) throw new Error("No active wallet provider found.");
+
             try {
-                await window.ethereum.request({
+                await activeProv.request({
                     method: 'wallet_switchEthereumChain',
                     params: [{ chainId: SEPOLIA_CHAIN_ID }],
                 });
             } catch (switchError) {
-                if (switchError.code === 4902) {
-                    await window.ethereum.request({
+                // Code 4902 or -32603 indicates chain has not been added to wallet
+                if (switchError.code === 4902 || switchError.code === -32603 || switchError?.data?.originalError?.code === 4902) {
+                    await activeProv.request({
                         method: 'wallet_addEthereumChain',
                         params: [{
                             chainId: SEPOLIA_CHAIN_ID,
@@ -1403,7 +1442,15 @@
                             blockExplorerUrls: ['https://sepolia.etherscan.io']
                         }],
                     });
+                } else {
+                    throw switchError;
                 }
+            }
+
+            // Verify chain ID post switch
+            const currentChain = await activeProv.request({ method: 'eth_chainId' });
+            if (currentChain.toLowerCase() !== SEPOLIA_CHAIN_ID.toLowerCase()) {
+                throw new Error("Wallet switch rejected: network must be Sepolia.");
             }
         }
 
@@ -1414,14 +1461,22 @@
                 return showToast("Ethers.js library failed to load. Check CDN connection.");
             }
 
-            if (!window.ethereum) {
-                if (!isAutoConnect) showToast("No wallet provider detected!");
+            const rawProv = getWalletProvider(providerType);
+
+            if (!rawProv) {
+                if (!isAutoConnect) showToast(`Requested wallet (${providerType}) is not installed or available.`);
                 return;
             }
 
             try {
-                if (!isAutoConnect) await forceSepoliaNetwork();
-                provider = new ethers.BrowserProvider(window.ethereum);
+                // Request account access first
+                await rawProv.request({ method: 'eth_requestAccounts' });
+
+                // Force network switch to Sepolia unconditionally on all wallets
+                await forceSepoliaNetwork(rawProv);
+
+                activeRawProvider = rawProv;
+                provider = new ethers.BrowserProvider(rawProv);
                 signer = await provider.getSigner();
                 userAddress = await signer.getAddress();
 
@@ -1431,26 +1486,51 @@
                 localStorage.setItem('piggy_wallet_type', providerType);
 
                 connectWalletBtn.innerText = `${userAddress.substring(0, 6)}...${userAddress.substring(38)}`;
-                if (!isAutoConnect) showToast(`Connected: ${userAddress.substring(0, 6)}`);
+                showToast(`Connected on Sepolia: ${userAddress.substring(0, 6)}`);
 
-                window.ethereum.on('accountsChanged', (accounts) => {
-                    if (accounts.length === 0) {
-                        disconnectWallet();
-                    } else {
-                        connectWallet(providerType);
-                    }
-                });
+                // Event Listeners for account or chain switching
+                if (rawProv.on) {
+                    rawProv.on('accountsChanged', (accounts) => {
+                        if (accounts.length === 0) {
+                            disconnectWallet();
+                        } else {
+                            connectWallet(providerType, true);
+                        }
+                    });
 
-                window.ethereum.on('chainChanged', () => {
-                    window.location.reload();
-                });
+                    rawProv.on('chainChanged', async (chainIdHex) => {
+                        if (chainIdHex.toLowerCase() !== SEPOLIA_CHAIN_ID.toLowerCase()) {
+                            showToast("Wrong network detected. Forcing Sepolia switch...");
+                            try {
+                                await forceSepoliaNetwork(rawProv);
+                                window.location.reload();
+                            } catch (e) {
+                                showToast("Network switch refused. Disconnecting wallet...");
+                                disconnectWallet();
+                            }
+                        } else {
+                            window.location.reload();
+                        }
+                    });
+                }
 
                 await fetchUserEthBalance();
                 await refreshProtocolStats();
                 await scanUserPiggies();
             } catch (err) {
-                if (!isAutoConnect) showToast(`Connection error: ${err.reason || err.message}`);
+                console.error("Wallet connection sequence error:", err);
+                if (!isAutoConnect) {
+                    const msg = err.reason || err.shortMessage || err.message || "Failed to switch/connect to Sepolia";
+                    showToast(`Connection error: ${msg}`);
+                }
+                disconnectWallet();
             }
+        }
+
+        // Verify active network before initiating any onchain action
+        async function ensureSepoliaBeforeTx() {
+            if (!activeRawProvider) throw new Error("Wallet provider not connected.");
+            await forceSepoliaNetwork(activeRawProvider);
         }
 
         // Auto-connect on page reload if previously connected
@@ -1924,6 +2004,7 @@
             if (!piggyContract || !signer) return showToast("Connect wallet first!");
 
             try {
+                await ensureSepoliaBeforeTx();
                 playPigSound();
 
                 let price = singleMintPriceWei;
@@ -1971,6 +2052,7 @@
             if (!piggyId || !tokenAddr || !naturalAmount) return showToast("Fill all token deposit fields");
 
             try {
+                await ensureSepoliaBeforeTx();
                 const parsedUnits = ethers.parseUnits(naturalAmount, activeTokenDecimals);
                 const tokenContract = new ethers.Contract(tokenAddr, ERC20_ABI, signer);
 
@@ -2007,6 +2089,7 @@
             if (!parentId || !childAddr || !childTokenId) return showToast("Fill all NFT fields");
 
             try {
+                await ensureSepoliaBeforeTx();
                 const nftContract = new ethers.Contract(childAddr, ERC721_ABI, signer);
                 showToast("Checking NFT approval...");
                 const approved = await nftContract.getApproved(childTokenId);
@@ -2034,6 +2117,7 @@
         document.getElementById('smashActiveBtn').addEventListener('click', async () => {
             if (!selectedPiggyId) return showToast("Select a piggy first");
             try {
+                await ensureSepoliaBeforeTx();
                 showToast(`Smashing piggy.#${selectedPiggyId}...`);
                 const tx = await piggyContract.smashPiggy(selectedPiggyId, Array.from(trackedErc20Tokens));
                 await tx.wait();
